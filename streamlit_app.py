@@ -85,7 +85,7 @@ Please enter your Function Health credentials to connect and download your data.
             if st.button("Email Data"):
                 try:
                     msg = EmailMessage()
-                    msg["Subject"] = f"Function Health Data – {st.session_state.user_id}"
+                    msg["Subject"] = f"Function Health Data – {st.session_state.get('user_id', 'GLCXXX')}"
                     msg["From"] = EMAIL
                     msg["To"] = st.session_state.email_target
                     msg.set_content("Attached is the Function Health data you requested.")
