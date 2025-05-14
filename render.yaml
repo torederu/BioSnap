@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: biosnap-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run streamlit_app.py
+    envVars:
+      - key: EMAIL_ADDRESS
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
