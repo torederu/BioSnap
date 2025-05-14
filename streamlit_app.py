@@ -5,13 +5,19 @@ import time
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
+import threading
+from flask_backend import app
 import os
+
+def run_flask():
+    app.run(host="0.0.0.0", port=5000)
+
+threading.Thread(target=run_flask).start()
 
 load_dotenv()
 
 EMAIL = os.getenv("EMAIL_ADDRESS")
 PASS = os.getenv("EMAIL_PASSWORD")
-
 
 st.set_page_config(page_title="HealthPort", layout="centered")
 tab1, tab2 = st.tabs(["Function Health", "Prenuvo"])
