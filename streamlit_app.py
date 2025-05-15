@@ -53,10 +53,10 @@ Please enter your Function Health credentials to connect and download your data.
         
             with st.spinner("Importing data..."):
 
-            st.write("Data being sent:", {
-            "email": user_email,
-            "glc_id": user_id
-            })
+                st.write("Data being sent:", {
+                "email": user_email,
+                "glc_id": user_id
+                })
             
                 try:
                     response = requests.post("http://127.0.0.1:5000/scrape", json={
