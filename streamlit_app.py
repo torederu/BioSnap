@@ -52,7 +52,12 @@ Please enter your Function Health credentials to connect and download your data.
             status_text = st.empty()
         
             with st.spinner("Importing data..."):
-    
+
+            st.write("Data being sent:", {
+            "email": user_email,
+            "glc_id": user_id
+            })
+            
                 try:
                     response = requests.post("http://127.0.0.1:5000/scrape", json={
                         "email": user_email,
@@ -104,8 +109,6 @@ Please enter your Function Health credentials to connect and download your data.
 
         with col2:
             st.download_button("Download Data", st.session_state.csv, file_name=st.session_state.csv_filename)
-
-        #st.dataframe(pd.read_csv(pd.io.common.BytesIO(st.session_state.csv)))
 
 with tab2:
     st.title("Prenuvo Data (Coming Soon)")
