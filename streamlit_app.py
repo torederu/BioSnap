@@ -21,11 +21,23 @@ def scrape_function_health(user_email, user_pass):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
+
+    try:
+        service = Service("/usr/bin/chromedriver") 
+        options.add_argument(f"--binary=/usr/bin/chromium") 
+    except Exception as e:
+        print(f"Error setting up Selenium Service: {e}")
+        raise 
+
+    driver = None
     
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
+    
+    # driver = webdriver.Chrome(
+    #     service=Service(ChromeDriverManager().install()),
+    #     options=options
+    # )
     
     driver.get("https://my.functionhealth.com/")
     driver.maximize_window()
@@ -151,6 +163,7 @@ Please enter your Function Health credentials to connect and download your data.
                         smtp.send_message(msg)
 
                     st.success(f"Sent {st.session_state.csv_filename} to {st.session_state.email_target}")
+                
                 except Exception as e:
                     st.error(f"Failed to send email: {type(e).__name__} — {e}")
 
