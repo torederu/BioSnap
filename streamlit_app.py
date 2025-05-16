@@ -21,39 +21,39 @@ def scrape_function_health(user_email, user_pass):
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
-
+    
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=options
     )
-
+    
     driver.get("https://my.functionhealth.com/")
     driver.maximize_window()
-
+    
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.ID, "email"))
     ).send_keys(user_email)
-
+    
     driver.find_element(By.ID, "password").send_keys(user_pass + Keys.RETURN)
     time.sleep(5)
-
+    
     driver.get("https://my.functionhealth.com/biomarkers")
-
+    
     WebDriverWait(driver, 12).until(
-        EC.presence_of_element_located((By.CLASS_NAME, "biomarkerResultRow-styled__BiomarkerName-sc-3bf584b3-1"))
+        EC.presence_of_element_located((By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']"))
     )
-
+    
     everything = driver.find_elements(By.XPATH, "//h4 | //div[contains(@class, 'biomarkerResult-styled__ResultContainer')]")
     data = []
     current_category = None
-
+    
     for el in everything:
         tag = el.tag_name
         if tag == "h4":
             current_category = el.text.strip()
         elif tag == "div":
             try:
-                name = el.find_element(By.CLASS_NAME, "biomarkerResultRow-styled__BiomarkerName-sc-3bf584b3-1").text.strip()
+                name = el.find_element(By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']").text.strip()
                 status = value = units = ""
                 values = el.find_elements(By.CSS_SELECTOR, "[class*='biomarkerChart-styled__ResultValue']")
                 texts = [v.text.strip() for v in values]
@@ -68,7 +68,7 @@ def scrape_function_health(user_email, user_pass):
                     units = unit_el.text.strip()
                 except:
                     pass
-
+    
                 data.append({
                     "category": current_category,
                     "name": name,
