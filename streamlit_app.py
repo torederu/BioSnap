@@ -91,16 +91,16 @@ def scrape_function_health(user_email, user_pass):
                 except Exception:
                     continue
     
-        except Exception as e:
-            print(f"An error occurred during scraping process: {type(e).__name__} — {e}")
-            raise e
+    except Exception as e:
+        print(f"An error occurred during scraping process: {type(e).__name__} — {e}")
+        raise e
 
-        finally:
-            if driver:
-                try:
-                     driver.quit()
-                except Exception as quit_error:
-                      print(f"Error quitting driver: {quit_error}")       
+    finally:
+        if driver:
+            try:
+                 driver.quit()
+            except Exception as quit_error:
+                  print(f"Error quitting driver: {quit_error}")       
         
     return pd.DataFrame(data)
 
