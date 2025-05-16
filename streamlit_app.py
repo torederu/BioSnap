@@ -28,70 +28,80 @@ def scrape_function_health(user_email, user_pass):
     except Exception as e:
         print(f"Error setting up Selenium Service: {e}")
         raise 
-
-    driver = None
-    
-    try:
-        driver = webdriver.Chrome(service=service, options=options)
     
     # driver = webdriver.Chrome(
     #     service=Service(ChromeDriverManager().install()),
     #     options=options
     # )
     
-    driver.get("https://my.functionhealth.com/")
-    driver.maximize_window()
+    driver = None
     
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.ID, "email"))
-    ).send_keys(user_email)
-    
-    driver.find_element(By.ID, "password").send_keys(user_pass + Keys.RETURN)
-    time.sleep(5)
-    
-    driver.get("https://my.functionhealth.com/biomarkers")
-    
-    WebDriverWait(driver, 12).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']"))
-    )
-    
-    everything = driver.find_elements(By.XPATH, "//h4 | //div[contains(@class, 'biomarkerResult-styled__ResultContainer')]")
-    data = []
-    current_category = None
-    
-    for el in everything:
-        tag = el.tag_name
-        if tag == "h4":
-            current_category = el.text.strip()
-        elif tag == "div":
-            try:
-                name = el.find_element(By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']").text.strip()
-                status = value = units = ""
-                values = el.find_elements(By.CSS_SELECTOR, "[class*='biomarkerChart-styled__ResultValue']")
-                texts = [v.text.strip() for v in values]
-                if len(texts) == 3:
-                    status, value, units = texts
-                elif len(texts) == 2:
-                    status, value = texts
-                elif len(texts) == 1:
-                    value = texts[0]
-                try:
-                    unit_el = el.find_element(By.CSS_SELECTOR, "[class^='biomarkerChart-styled__UnitValue']")
-                    units = unit_el.text.strip()
-                except:
-                    pass
-    
-                data.append({
-                    "category": current_category,
-                    "name": name,
-                    "status": status,
-                    "value": value,
-                    "units": units
-                })
-            except Exception:
-                continue
+    try:
+        driver = webdriver.Chrome(service=service, options=options)
 
-    driver.quit()
+        driver.get("https://my.functionhealth.com/")
+        driver.maximize_window()
+        
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "email"))
+        ).send_keys(user_email)
+        
+        driver.find_element(By.ID, "password").send_keys(user_pass + Keys.RETURN)
+        time.sleep(5)
+        
+        driver.get("https://my.functionhealth.com/biomarkers")
+        
+        WebDriverWait(driver, 12).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']"))
+        )
+        
+        everything = driver.find_elements(By.XPATH, "//h4 | //div[contains(@class, 'biomarkerResult-styled__ResultContainer')]")
+        data = []
+        current_category = None
+        
+        for el in everything:
+            tag = el.tag_name
+            if tag == "h4":
+                current_category = el.text.strip()
+            elif tag == "div":
+                try:
+                    name = el.find_element(By.CSS_SELECTOR, "[class^='biomarkerResultRow-styled__BiomarkerName']").text.strip()
+                    status = value = units = ""
+                    values = el.find_elements(By.CSS_SELECTOR, "[class*='biomarkerChart-styled__ResultValue']")
+                    texts = [v.text.strip() for v in values]
+                    if len(texts) == 3:
+                        status, value, units = texts
+                    elif len(texts) == 2:
+                        status, value = texts
+                    elif len(texts) == 1:
+                        value = texts[0]
+                    try:
+                        unit_el = el.find_element(By.CSS_SELECTOR, "[class^='biomarkerChart-styled__UnitValue']")
+                        units = unit_el.text.strip()
+                    except:
+                        pass
+        
+                    data.append({
+                        "category": current_category,
+                        "name": name,
+                        "status": status,
+                        "value": value,
+                        "units": units
+                    })
+                except Exception:
+                    continue
+    
+        except Exception as e:
+            print(f"An error occurred during scraping process: {type(e).__name__} — {e}")
+            raise e
+
+        finally:
+            if driver:
+                try:
+                     driver.quit()
+                except Exception as quit_error:
+                      print(f"Error quitting driver: {quit_error}")       
+        
     return pd.DataFrame(data)
 
 # === Streamlit App ===
@@ -163,7 +173,6 @@ Please enter your Function Health credentials to connect and download your data.
                         smtp.send_message(msg)
 
                     st.success(f"Sent {st.session_state.csv_filename} to {st.session_state.email_target}")
-                
                 except Exception as e:
                     st.error(f"Failed to send email: {type(e).__name__} — {e}")
 
