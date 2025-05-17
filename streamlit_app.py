@@ -64,14 +64,14 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
 
-    # try:
-    #     service = Service("/usr/bin/chromedriver") 
-    #     options.add_argument(f"--binary=/usr/bin/chromium") 
-    # except Exception as e:
-    #     print(f"Error setting up Selenium Service: {e}")
-    #     raise 
+    try:
+        service = Service("/usr/bin/chromedriver") 
+        options.add_argument(f"--binary=/usr/bin/chromium") 
+    except Exception as e:
+        print(f"Error setting up Selenium Service: {e}")
+        raise 
 
-    service = Service(ChromeDriverManager().install())
+    #service = Service(ChromeDriverManager().install())
 
     driver = None
     
