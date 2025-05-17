@@ -5,3 +5,4 @@ __pycache__/
 .scrape-env/
 .learn-env/
 .ipynb_checkpoints/
+config.yaml
