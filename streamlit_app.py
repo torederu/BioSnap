@@ -491,12 +491,12 @@ with tab2:
             except Exception as e:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
 
-with tab3: 
+with tab3:
     st.markdown("<h1>Submit Test Kit Results</h1>", unsafe_allow_html=True)
     testkit_filename = f"{username}/test_kits.csv"
     bucket = user_supabase.storage.from_("data")
 
-    # === Load saved data ===
+    # === Load saved data into session state ===
     if "test_kit_df" not in st.session_state:
         try:
             file_bytes = bucket.download(testkit_filename)
@@ -504,63 +504,71 @@ with tab3:
         except Exception:
             st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
 
+    # === Reset logic ===
     if st.session_state.get("reset_test_kit", False):
-        st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
-        st.session_state.pop("reset_test_kit")
-        try:
-            bucket.remove([testkit_filename])
-        except:
-            pass
-        st.success("Form has been reset.")
+        with st.spinner("Deleting file from database..."):
+            st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+            st.session_state.pop("reset_test_kit")
+            try:
+                bucket.remove([testkit_filename])
+            except:
+                pass
+            time.sleep(1)
+            st.success("Form has been reset.")
+            st.rerun()
 
-    # === Form ===
-    with st.form("test_kit_form"):
-        telomere_age = st.text_input("Trudiagnostic: Estimated Telomere Age")
-        nad = st.text_input("BioStarks: NAD+ levels")
-        magnesium = st.text_input("BioStarks: Magnesium levels")
-        selenium = st.text_input("BioStarks: Selenium levels")
-        zinc = st.text_input("BioStarks: Zinc levels")
-        longevity = st.text_input("BioStarks: Longevity NAD+ Score")
-        vo2max = st.text_input("Hero: VO2 Max (best result)")
+    # === Show form only if no data is present ===
+    if st.session_state.test_kit_df.empty:
+        with st.form("test_kit_form"):
+            telomere_age = st.text_input("Trudiagnostic: Estimated Telomere Age")
+            nad = st.text_input("BioStarks: NAD+ levels")
+            magnesium = st.text_input("BioStarks: Magnesium levels")
+            selenium = st.text_input("BioStarks: Selenium levels")
+            zinc = st.text_input("BioStarks: Zinc levels")
+            longevity = st.text_input("BioStarks: Longevity NAD+ Score")
+            vo2max = st.text_input("Hero: VO2 Max (best result)")
 
-        submitted = st.form_submit_button("Submit")
+            submitted = st.form_submit_button("Submit", key="submit_testkit")
 
-    if submitted:
-        df = pd.DataFrame([
-            ["Trudiagnostic", "Estimated Telomere Age", telomere_age],
-            ["BioStarks", "NAD+ levels", nad],
-            ["BioStarks", "Magnesium levels", magnesium],
-            ["BioStarks", "Selenium levels", selenium],
-            ["BioStarks", "Zinc levels", zinc],
-            ["BioStarks", "Longevity NAD+ Score", longevity],
-            ["Hero", "VO2 Max (best result)", vo2max],
-        ], columns=["Test Kit", "Metric", "Value"])
+        if submitted:
+            df = pd.DataFrame([
+                ["Trudiagnostic", "Estimated Telomere Age", telomere_age],
+                ["BioStarks", "NAD+ levels", nad],
+                ["BioStarks", "Magnesium levels", magnesium],
+                ["BioStarks", "Selenium levels", selenium],
+                ["BioStarks", "Zinc levels", zinc],
+                ["BioStarks", "Longevity NAD+ Score", longevity],
+                ["Hero", "VO2 Max (best result)", vo2max],
+            ], columns=["Test Kit", "Metric", "Value"])
 
-        st.session_state.test_kit_df = df
-        csv_bytes = df.to_csv(index=False).encode()
+            with st.spinner("Saving to database..."):
+                st.session_state.test_kit_df = df
+                csv_bytes = df.to_csv(index=False).encode()
 
-        try:
-            bucket.remove([testkit_filename])
-        except:
-            pass
+                try:
+                    bucket.remove([testkit_filename])
+                except:
+                    pass
 
-        bucket.upload(
-            path=testkit_filename,
-            file=csv_bytes,
-            file_options={"content-type": "text/csv"}
-        )
+                bucket.upload(
+                    path=testkit_filename,
+                    file=csv_bytes,
+                    file_options={"content-type": "text/csv"}
+                )
 
-        st.success("Test Kit data saved successfully.")
-        st.rerun()
+                time.sleep(1)
+                st.success("Test Kit data saved successfully.")
+                st.rerun()
 
-    # === Show table and reset ===
-    if not st.session_state.test_kit_df.empty:
+    # === Show results if data is present ===
+    else:
         st.subheader("Your Test Kit Results")
         st.dataframe(st.session_state.test_kit_df)
 
-        if st.button("Start Over"):
+        if st.button("Start Over", key="reset_testkit"):
             st.session_state.reset_test_kit = True
             st.rerun()
+
 
 with tab4:
     st.markdown("## Behavioral Data")
