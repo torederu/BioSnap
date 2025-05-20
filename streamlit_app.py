@@ -109,14 +109,14 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
 
-    try:
-        service = Service("/usr/bin/chromedriver") 
-        options.add_argument(f"--binary=/usr/bin/chromium") 
-    except Exception as e:
-        print(f"Error setting up Selenium Service: {e}")
-        raise 
+    # try:
+    #     service = Service("/usr/bin/chromedriver") 
+    #     options.add_argument(f"--binary=/usr/bin/chromium") 
+    # except Exception as e:
+    #     print(f"Error setting up Selenium Service: {e}")
+    #     raise 
 
-    #service = Service(ChromeDriverManager().install())
+    service = Service(ChromeDriverManager().install())
 
     driver = None
     
@@ -355,7 +355,7 @@ with tab1:
                     st.session_state.supabase_uploaded = True
         
                 st.session_state.to_initialize_csv = True
-                #st.rerun()
+                st.rerun()
         
             except ValueError as ve:
                 progress_bar.empty()
@@ -491,7 +491,79 @@ with tab2:
             except Exception as e:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
 
-with tab3:
+with tab3: 
+    st.header("Submit Test Kit Results")
+
+    testkit_filename = f"{username}/test_kits.csv"
+    bucket = user_supabase.storage.from_("data")
+
+    # === Load saved data ===
+    if "test_kit_df" not in st.session_state:
+        try:
+            file_bytes = bucket.download(testkit_filename)
+            st.session_state.test_kit_df = pd.read_csv(io.BytesIO(file_bytes))
+        except Exception:
+            st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+
+    if st.session_state.get("reset_test_kit", False):
+        st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+        st.session_state.pop("reset_test_kit")
+        try:
+            bucket.remove([testkit_filename])
+        except:
+            pass
+        st.success("Form has been reset.")
+
+    # === Form ===
+    with st.form("test_kit_form"):
+        telomere_age = st.text_input("Trudiagnostic: Estimated Telomere Age")
+        nad = st.text_input("BioStarks: NAD+ levels")
+        magnesium = st.text_input("BioStarks: Magnesium levels")
+        selenium = st.text_input("BioStarks: Selenium levels")
+        zinc = st.text_input("BioStarks: Zinc levels")
+        longevity = st.text_input("BioStarks: Longevity NAD+ Score")
+        vo2max = st.text_input("Hero: VO2 Max (best result)")
+
+        submitted = st.form_submit_button("Submit")
+
+    if submitted:
+        df = pd.DataFrame([
+            ["Trudiagnostic", "Estimated Telomere Age", telomere_age],
+            ["BioStarks", "NAD+ levels", nad],
+            ["BioStarks", "Magnesium levels", magnesium],
+            ["BioStarks", "Selenium levels", selenium],
+            ["BioStarks", "Zinc levels", zinc],
+            ["BioStarks", "Longevity NAD+ Score", longevity],
+            ["Hero", "VO2 Max (best result)", vo2max],
+        ], columns=["Test Kit", "Metric", "Value"])
+
+        st.session_state.test_kit_df = df
+        csv_bytes = df.to_csv(index=False).encode()
+
+        try:
+            bucket.remove([testkit_filename])
+        except:
+            pass
+
+        bucket.upload(
+            path=testkit_filename,
+            file=csv_bytes,
+            file_options={"content-type": "text/csv"}
+        )
+
+        st.success("Test Kit data saved successfully.")
+        st.rerun()
+
+    # === Show table and reset ===
+    if not st.session_state.test_kit_df.empty:
+        st.subheader("Your Test Kit Results")
+        st.dataframe(st.session_state.test_kit_df)
+
+        if st.button("Start Over"):
+            st.session_state.reset_test_kit = True
+            st.rerun()
+
+with tab4:
     st.markdown("## Behavioral Data")
     behavior_file = f"{username}/behavioral_scores.csv"
     try:
@@ -546,7 +618,20 @@ with tab3:
             st.warning("There was an error retrieving your Function Health data. Please contact admin.")
 
     st.markdown("## Prenuvo Data")
-    st.info("Please add your Biostarks data.")
+    st.info("Please add your Prenuvo data.")
 
-    st.markdown("## Oregon Data")
-    st.info("Please add your Oregon data.")
+    st.markdown("## Test kit")
+    testkit_file = f"{username}/test_kits.csv"
+    try:
+        testkit_bytes = user_supabase.storage.from_("data").download(testkit_file)
+        if isinstance(testkit_bytes, bytes):
+            testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
+            st.dataframe(testkit_df)
+        else:
+            st.info("Please add your Test Kit data.")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "no such file" in error_msg:
+            st.info("Please add your Test Kit data.")
+        else:
+            st.warning("There was an error retrieving your Test Kit data. Please contact admin.")
