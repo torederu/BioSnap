@@ -122,7 +122,7 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     
     try:
         if status:
-            update_progress(status, progress_bar, "Launching virtual browser...", 10)
+            update_progress(status, progress_bar, "Launching remote browser...", 10)
         
         driver = webdriver.Chrome(service=service, options=options)
         driver.get("https://my.functionhealth.com/")
@@ -197,7 +197,7 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     finally:
         if driver:
             try:
-                update_progress(status, progress_bar, "Closing virtual browser...", 97)
+                update_progress(status, progress_bar, "Closing remote browser...", 97)
                 driver.quit()
                 time.sleep(1) 
         
@@ -326,7 +326,6 @@ with tab1:
                 status.empty()
                 progress_bar.empty()
 
-        
                 csv_bytes = df.to_csv(index=False).encode()
                 st.session_state.csv = csv_bytes
                 st.session_state.df = df 
@@ -341,7 +340,7 @@ with tab1:
                 try:
                     bucket.remove([filename])
                 except Exception:
-                    pass  # File may not exist
+                    pass 
         
                 response = bucket.upload(
                     path=filename,
@@ -356,7 +355,7 @@ with tab1:
                     st.session_state.supabase_uploaded = True
         
                 st.session_state.to_initialize_csv = True
-                st.rerun()
+                #st.rerun()
         
             except ValueError as ve:
                 progress_bar.empty()
@@ -509,6 +508,22 @@ with tab3:
         else:
             st.warning("There was an error retrieving your behavioral data. Please contact admin.")
 
+    st.markdown("## Oregon Data")
+    behavior_file = f"{username}/Oregon.csv"
+    try:
+        behavior_bytes = user_supabase.storage.from_("data").download(behavior_file)
+        if isinstance(behavior_bytes, bytes):
+            behavior_df = pd.read_csv(io.BytesIO(behavior_bytes))
+            st.dataframe(behavior_df)
+        else:
+            st.info("Please add your behavioral data.")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "no such file" in error_msg:
+            st.info("Please add your behavioral data.")
+        else:
+            st.warning("There was an error retrieving your behavioral data. Please contact admin.")
+
     st.markdown("## Function Health Data")
 
     filename = f"{username}/functionhealth.csv"
@@ -529,9 +544,6 @@ with tab3:
             st.info("Please import your Function Health data.")
         else:
             st.warning("There was an error retrieving your Function Health data. Please contact admin.")
-
-    st.markdown("## Prenuvo Data")
-    st.info("Please add your Prenuvo data.")
 
     st.markdown("## Prenuvo Data")
     st.info("Please add your Biostarks data.")
