@@ -366,7 +366,7 @@ with tab1:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
                         
 with tab2:
-    st.markdown("## Prenuvo Data")
+    st.markdown("<h1>Prenuvo Data</h1>", unsafe_allow_html=True)
     pdf_filename = f"{username}/redacted_prenuvo_report.pdf"
     
     try:
@@ -382,7 +382,7 @@ with tab2:
                     style="border: none;">
                 </iframe>
             """
-            st.markdown("### Your Redacted Prenuvo Report", unsafe_allow_html=True)
+            st.markdown("<h1>Prenuvo Data</h1>", unsafe_allow_html=True)
             st.markdown(pdf_display, unsafe_allow_html=True)
         else:
             st.info("Please add your Prenuvo data.")
@@ -544,10 +544,10 @@ with tab4:
         if "not found" in error_msg or "no such file" in error_msg:
             st.info("Please add your Prenuvo data.")
         else:
-            st.warning("Please add your Prenuvo data.")
+            st.info("Please add your Prenuvo data.")
 
 
-    st.markdown("## Test kit")
+    st.markdown("## Test Kits")
     testkit_file = f"{username}/test_kits.csv"
     try:
         testkit_bytes = user_supabase.storage.from_("data").download(testkit_file)
