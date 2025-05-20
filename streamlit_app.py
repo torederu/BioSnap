@@ -366,130 +366,26 @@ with tab1:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
                         
 with tab2:
-    st.markdown("<h1>Prenuvo</h1>", unsafe_allow_html=True)
+    st.markdown("## Your Redacted Prenuvo Report")
 
-    # === If deletion is in progress, stop everything else ===
-    if st.session_state.get("prenuvo_deleting", False):
-        with st.spinner("Deleting file from database..."):
-            st.session_state.pop("prenuvo_ready", None)
-            st.session_state.pop("prenuvo_csv", None)
-            st.session_state.pop("prenuvo_df", None)
-            st.session_state.pop("prenuvo_filename", None)
-            st.session_state.pop("prenuvo_uploaded", None)
-            st.session_state.pop("prenuvo_email", None)
-            st.session_state.pop("prenuvo_password", None)
+    prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
+    bucket = user_supabase.storage.from_("data")
 
-            try:
-                bucket = user_supabase.storage.from_("data")
-                bucket.remove([f"{username}/prenuvo.csv"])
+    try:
+        file_bytes = bucket.download(prenuvo_pdf_path)
+        if isinstance(file_bytes, bytes):
+            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
+        else:
+            st.info("No redacted Prenuvo report found. Please upload one.")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "no such file" in error_msg:
+            st.info("No redacted Prenuvo report found. Please upload one.")
+        else:
+            st.warning("There was an error retrieving your Prenuvo report. Please contact admin.")
 
-                max_attempts = 20
-                file_still_exists = True
-
-                for attempt in range(max_attempts):
-                    time.sleep(3)
-                    files = bucket.list(path=f"{username}/")
-                    file_still_exists = any(f["name"] == "prenuvo.csv" for f in files)
-                    if not file_still_exists:
-                        break
-
-                if not file_still_exists:
-                    st.success("Resetting...")
-                    time.sleep(1.5)
-                    st.session_state.prenuvo_skip_restore = True
-                    st.session_state.prenuvo_deleted = True
-                    st.session_state.pop("prenuvo_deleting", None)
-                    st.rerun()
-                else:
-                    st.error("File deletion timed out after 60 seconds. Please try again or check your connection.")
-            except Exception as e:
-                st.error(f"Something went wrong while deleting your file: {e}")
-
-    # === If data is loaded, show it ===
-    elif st.session_state.get("prenuvo_ready") and "prenuvo_df" in st.session_state:
-        st.dataframe(st.session_state.prenuvo_df)
-        st.success("Import successful!")
-
-        if st.button("Start Over", key="prenuvo_reset"):
-            st.session_state.prenuvo_deleting = True
-            st.rerun()
-
-    # === If no data, show login form ===
-    else:
-        st.markdown("""
-        <div style='font-size:17.5px; line-height:1.6'>
-        Please enter your Prenuvo credentials to connect and download your data.
-        </div>""", unsafe_allow_html=True)
-
-        st.markdown("""
-        <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
-        <strong>Your Information Stays Private:</strong> We do not store your credentials. They are used once to connect to Prenuvo to download your data, and then are immediately erased from memory.
-        </div>""", unsafe_allow_html=True)
-
-        with st.form("prenuvo_login_form"):
-            user_email = st.text_input("Email", key="prenuvo_email")
-            user_pass = st.text_input("Password", type="password", key="prenuvo_password")
-            submitted = st.form_submit_button("Connect & Import Data")
-
-        if submitted:
-            if not user_email or not user_pass:
-                st.error("Please enter email and password.")
-                st.stop()
-
-            st.session_state.pop("prenuvo_skip_restore", None)
-            progress_bar = st.progress(0)
-            status = st.empty()
-
-            try:
-                # === Replace this with your actual scraping logic ===
-                df = scrape_prenuvo(user_email, user_pass, status, progress_bar)
-                update_progress(status, progress_bar, "Deleting Prenuvo credentials from memory...", 98)
-
-                del user_email
-                del user_pass
-                st.session_state.pop("prenuvo_email", None)
-                st.session_state.pop("prenuvo_password", None)
-                time.sleep(1)
-                status.empty()
-                progress_bar.empty()
-
-                csv_bytes = df.to_csv(index=False).encode()
-                st.session_state.prenuvo_csv = csv_bytes
-                st.session_state.prenuvo_df = df
-                st.session_state.prenuvo_filename = f"{username}_prenuvo.csv"
-                st.session_state.prenuvo_file = csv_bytes
-
-                # Upload to Supabase
-                filename = f"{username}/prenuvo.csv"
-                bucket = user_supabase.storage.from_("data")
-
-                try:
-                    bucket.remove([filename])
-                except Exception:
-                    pass
-
-                response = bucket.upload(
-                    path=filename,
-                    file=csv_bytes,
-                    file_options={"content-type": "text/csv"}
-                )
-
-                res_data = response.__dict__
-                if "error" in res_data and res_data["error"]:
-                    st.error("Upload failed.")
-                else:
-                    st.session_state.prenuvo_uploaded = True
-
-                st.session_state.prenuvo_ready = True
-                st.rerun()
-
-            except ValueError as ve:
-                progress_bar.empty()
-                status.empty()
-                st.error(str(ve))
-
-            except Exception as e:
-                st.error(f"Scraping failed: {type(e).__name__} — {e}")
 
 with tab3:
     st.markdown("<h1>Submit Test Kit Results</h1>", unsafe_allow_html=True)
@@ -625,7 +521,23 @@ with tab4:
             st.warning("There was an error retrieving your Function Health data. Please contact admin.")
 
     st.markdown("## Prenuvo Data")
-    st.info("Please add your Prenuvo data.")
+
+    prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
+    try:
+        file_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
+        if isinstance(file_bytes, bytes):
+            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+            st.markdown(pdf_display, unsafe_allow_html=True)
+        else:
+            st.info("Please add your Prenuvo data.")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "no such file" in error_msg:
+            st.info("Please add your Prenuvo data.")
+        else:
+            st.warning("There was an error retrieving your Prenuvo data. Please contact admin.")
+
 
     st.markdown("## Test kit")
     testkit_file = f"{username}/test_kits.csv"
