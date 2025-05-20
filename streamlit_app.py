@@ -212,7 +212,7 @@ user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SER
 if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imported", False):
     st.rerun()
 
-tab1, tab2, tab3 = st.tabs(["Function Health", "Prenuvo", "Data Profile"])
+tab1, tab2, tab3, tab4 = st.tabs(["Function Health", "Prenuvo", "Test Kits", "Data Profile"])
 
 # === Try to restore saved CSV ===
 if not st.session_state.get("csv_ready") and not st.session_state.get("skip_restore"):
