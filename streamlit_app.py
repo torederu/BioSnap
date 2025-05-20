@@ -528,7 +528,7 @@ with tab3:
             longevity = st.text_input("BioStarks: Longevity NAD+ Score")
             vo2max = st.text_input("Hero: VO2 Max (best result)")
 
-            submitted = st.form_submit_button("Submit", key="submit_testkit")
+            submitted = st.form_submit_button("Submit")
 
         if submitted:
             df = pd.DataFrame([
