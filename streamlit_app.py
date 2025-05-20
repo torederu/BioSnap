@@ -366,25 +366,33 @@ with tab1:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
                         
 with tab2:
-    st.markdown("## Your Redacted Prenuvo Report")
-
-    prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
-    bucket = user_supabase.storage.from_("data")
-
+    st.markdown("## Prenuvo Data")
+    pdf_filename = f"{username}/redacted_prenuvo_report.pdf"
+    
     try:
-        file_bytes = bucket.download(prenuvo_pdf_path)
-        if isinstance(file_bytes, bytes):
-            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
+        bucket = user_supabase.storage.from_("data")
+        pdf_bytes = bucket.download(pdf_filename)
+    
+        if isinstance(pdf_bytes, bytes):
+            base64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+            pdf_display = f"""
+                <iframe 
+                    src="data:application/pdf;base64,{base64_pdf}" 
+                    width="100%" height="800px" 
+                    style="border: none;">
+                </iframe>
+            """
+            st.markdown("### Your Redacted Prenuvo Report", unsafe_allow_html=True)
             st.markdown(pdf_display, unsafe_allow_html=True)
         else:
-            st.info("No redacted Prenuvo report found. Please upload one.")
+            st.info("Please add your Prenuvo data.")
     except Exception as e:
         error_msg = str(e).lower()
         if "not found" in error_msg or "no such file" in error_msg:
-            st.info("No redacted Prenuvo report found. Please upload one.")
+            st.info("Please add your Prenuvo data.")
         else:
-            st.warning("There was an error retrieving your Prenuvo report. Please contact admin.")
+            st.warning("Please add your Prenuvo data.")
+
 
 
 with tab3:
@@ -536,7 +544,7 @@ with tab4:
         if "not found" in error_msg or "no such file" in error_msg:
             st.info("Please add your Prenuvo data.")
         else:
-            st.warning("There was an error retrieving your Prenuvo data. Please contact admin.")
+            st.warning("Please add your Prenuvo data.")
 
 
     st.markdown("## Test kit")
