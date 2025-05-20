@@ -88,8 +88,6 @@ if "supabase_user_checked" not in st.session_state:
             })
             st.session_state.supabase_uid = user.user.id
             st.success("Supabase user created.")
-        # else:
-        #     st.info("Supabase user already exists.")
 
         st.session_state.supabase_user_checked = True
 
@@ -495,11 +493,21 @@ with tab2:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
 
 with tab3:
-    st.markdown("## Clinical Data")
-    st.info("Please add your clinical data.")
-
     st.markdown("## Behavioral Data")
-    st.info("Please add your behavioral data.")
+    behavior_file = f"{username}/behavioral_scores.csv"
+    try:
+        behavior_bytes = user_supabase.storage.from_("data").download(behavior_file)
+        if isinstance(behavior_bytes, bytes):
+            behavior_df = pd.read_csv(io.BytesIO(behavior_bytes))
+            st.dataframe(behavior_df)
+        else:
+            st.info("Please add your behavioral data.")
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg or "no such file" in error_msg:
+            st.info("Please add your behavioral data.")
+        else:
+            st.warning("There was an error retrieving your behavioral data. Please contact admin.")
 
     st.markdown("## Function Health Data")
 
