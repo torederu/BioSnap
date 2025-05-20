@@ -109,14 +109,14 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
 
-    # try:
-    #     service = Service("/usr/bin/chromedriver") 
-    #     options.add_argument(f"--binary=/usr/bin/chromium") 
-    # except Exception as e:
-    #     print(f"Error setting up Selenium Service: {e}")
-    #     raise 
+    try:
+        service = Service("/usr/bin/chromedriver") 
+        options.add_argument(f"--binary=/usr/bin/chromium") 
+    except Exception as e:
+        print(f"Error setting up Selenium Service: {e}")
+        raise 
 
-    service = Service(ChromeDriverManager().install())
+    #service = Service(ChromeDriverManager().install())
 
     driver = None
     
@@ -492,8 +492,7 @@ with tab2:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
 
 with tab3: 
-    st.header("Submit Test Kit Results")
-
+    st.markdown("<h1>Submit Test Kit Results</h1>", unsafe_allow_html=True)
     testkit_filename = f"{username}/test_kits.csv"
     bucket = user_supabase.storage.from_("data")
 

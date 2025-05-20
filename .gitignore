@@ -6,3 +6,4 @@ __pycache__/
 .learn-env/
 .ipynb_checkpoints/
 config.yaml
+prenuvo_function.ipynb
