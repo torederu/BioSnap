@@ -608,42 +608,58 @@ with tab3:
 
             # === Input fields ===
             input_metric("Matter Score (all time)", """1. Open the Matter App on your iPhone  
-2. Click **"You"** → **"Stats"**  
-3. Scroll to **Stats to Date** → **Matter Score**""")
-
+            2. Tap **"You"** in the bottom menu  
+            3. Tap **"Stats"**  
+            4. Scroll to **Stats to Date**  
+            5. Find your **Matter Score**""")
+            
             st.divider()
-            input_metric("Matter: Number of Memories", """1. Open the Matter App  
-2. Go to **You → Stats** → **Total Memories**""")
-
+            input_metric("Matter: Number of Memories", """1. Open the Matter App on your iPhone  
+            2. Tap **"You"** in the bottom menu  
+            3. Tap **"Stats"**  
+            4. Scroll to **Stats to Date**  
+            5. Find **Total Memories**""")
+            
             st.divider()
-            input_metric("Trudiagnostic: Estimated Telomere Age", """1. Log in to [login.trudiagnostic.com](https://login.trudiagnostic.com)  
-2. Go to **My Reports** → **Telomere Report**  
-3. Find **Estimated Telomere Age**""")
-
+            input_metric("Trudiagnostic: Estimated Telomere Age", """1. **Log in to** [login.trudiagnostic.com](https://login.trudiagnostic.com)  
+            2. Click **"My Reports"** in the left menu  
+            3. Open your **Telomere Length Report**  
+            4. Scroll to **Estimated Telomere Age**""")
+            
             st.divider()
-            input_metric("BioStarks: Longevity NAD+ Score", """1. Login to [results.biostarks.com](https://results.biostarks.com)  
-2. Find your **Longevity Score** (0–100)""")
-
+            input_metric("BioStarks: Longevity NAD+ Score", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
+            2. Look for your **Longevity Score** (0–100)""")
+            
             st.divider()
-            input_metric("BioStarks: NAD+ Levels", """1. On the Longevity page, hover **NAD+** hexagon  
-2. Read value in **ug/gHb**""")
-
+            input_metric("BioStarks: NAD+ Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
+            2. Click your **Longevity Score**  
+            3. Hover over the **NAD+** hexagon  
+            4. Value will be shown in **ug/gHb**""")
+            
             st.divider()
-            input_metric("BioStarks: Magnesium Levels", """1. Hover **Mg** hexagon on the Longevity page  
-2. Read value in **ug/gHb**""")
-
+            input_metric("BioStarks: Magnesium Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
+            2. Click your **Longevity Score**  
+            3. Hover over the **Mg** hexagon  
+            4. Value will be shown in **ug/gHb**""")
+            
             st.divider()
-            input_metric("BioStarks: Selenium Levels", """1. Hover **Se** hexagon  
-2. Read value in **ug/gHb**""")
-
+            input_metric("BioStarks: Selenium Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
+            2. Click your **Longevity Score**  
+            3. Hover over the **Se** hexagon  
+            4. Value will be shown in **ug/gHb**""")
+            
             st.divider()
-            input_metric("BioStarks: Zinc Levels", """1. Hover **Zn** hexagon  
-2. Read value in **ug/gHb**""")
-
+            input_metric("BioStarks: Zinc Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
+            2. Click your **Longevity Score**  
+            3. Hover over the **Zn** hexagon  
+            4. Value will be shown in **ug/gHb**""")
+            
             st.divider()
-            input_metric("Hero: VO2 Max (best result)", "Log into the Hero App on your iPhone and look for your best recorded VO2 Max.")
-
+            input_metric("Hero: VO2 Max (best result)", """1. Open the Hero App on your iPhone  
+            2. Look for your highest **VO2 Max** result""")
+            
             submitted = st.form_submit_button("Submit")
+
 
         required_keys = [
             "Matter Score (all time)",
