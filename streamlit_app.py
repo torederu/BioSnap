@@ -432,13 +432,15 @@ with tab2:
     file_exists = False
     file_bytes = None
     
-    # Try to load from Supabase first if it's already approved
-    if st.session_state.get("approved_redaction"):
-        try:
-            file_bytes = bucket.download(filename)
-            file_exists = isinstance(file_bytes, bytes)
-        except:
-            pass # File not in Supabase yet, or error downloading
+    # Always try to load from Supabase first
+    try:
+        file_bytes = bucket.download(filename)
+        if isinstance(file_bytes, bytes):
+            file_exists = True
+            st.session_state.approved_redaction = True  # <-- persist success
+    except:
+        file_exists = False
+
 
     # If not from Supabase or not yet approved, check session state for the redacted file ready for review
     if not file_exists and "redacted_pdf_for_review" in st.session_state:
@@ -472,8 +474,6 @@ with tab2:
 
 
         # === PDF Viewer ===
-        
-        
         # Convert PDF bytes to images
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         page_images = [
@@ -497,9 +497,6 @@ with tab2:
         """
         
         components.html(scrollable_html, height=670, scrolling=False)
-
-
-
 
 
         if st.session_state.get("approved_redaction"):
@@ -810,22 +807,38 @@ with tab4:
             st.warning("There was an error retrieving your Function Health data. Please contact admin.")
 
     st.markdown("## Prenuvo Data")
-
     prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
+    
     try:
         file_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
         if isinstance(file_bytes, bytes):
-            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-            pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600px" type="application/pdf"></iframe>'
-            st.markdown(pdf_display, unsafe_allow_html=True)
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            page_images = [
+                page.get_pixmap(dpi=150).tobytes("png")
+                for page in doc
+                if page.get_text().strip()
+            ]
+            doc.close()
+    
+            # Convert each image to base64 HTML
+            img_html_blocks = []
+            for i, img_bytes in enumerate(page_images):
+                b64_img = base64.b64encode(img_bytes).decode()
+                img_html_blocks.append(f"<img src='data:image/png;base64,{b64_img}' style='width:100%; margin-bottom: 1.5rem;'/>")
+    
+            scrollable_html = f"""
+            <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
+                {''.join(img_html_blocks)}
+            </div>
+            """
+    
+            components.html(scrollable_html, height=670, scrolling=False)
+    
         else:
             st.info("Please add your Prenuvo data.")
     except Exception as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please add your Prenuvo data.")
-        else:
-            st.info("Please add your Prenuvo data.")
+        st.warning(f"Error loading file: {e}")
+
 
 
     st.markdown("## Test Kit & App Data")
