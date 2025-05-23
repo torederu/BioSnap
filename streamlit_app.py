@@ -14,6 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 import streamlit_authenticator as stauth
 from yaml.loader import SafeLoader
+import streamlit.components.v1 as components
 import yaml
 import os
 import io
@@ -460,12 +461,46 @@ with tab2:
                 </div>
             """, unsafe_allow_html=True)
 
+            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+
+            st.markdown(f"""
+            <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
+            <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_prenuvo_report.pdf">Click here to download the redacted report.</a><br>
+            Or scroll through the preview below to review each page.
+            </div>
+            """, unsafe_allow_html=True)
+
+
         # === PDF Viewer ===
-        base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-        st.markdown(
-            f'<iframe src="data:application/pdf;base64,{base64_pdf}#navpanes=0" width="100%" height="800px"></iframe>',
-            unsafe_allow_html=True
-        )
+        
+        
+        # Convert PDF bytes to images
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        page_images = [
+            page.get_pixmap(dpi=150).tobytes("png")
+            for page in doc
+            if page.get_text().strip()  # skip empty pages
+        ]
+        doc.close()
+        
+        # Encode all images as base64
+        img_html_blocks = []
+        for i, img_bytes in enumerate(page_images):
+            b64_img = base64.b64encode(img_bytes).decode()
+            img_html_blocks.append(f"<img src='data:image/png;base64,{b64_img}' style='width:100%; margin-bottom: 1.5rem;'/>")
+        
+        # Combine into one scrollable HTML block
+        scrollable_html = f"""
+        <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
+            {''.join(img_html_blocks)}
+        </div>
+        """
+        
+        components.html(scrollable_html, height=670, scrolling=False)
+
+
+
+
 
         if st.session_state.get("approved_redaction"):
             st.success("Upload successful!")
