@@ -607,56 +607,57 @@ with tab3:
                 st.text_input(label, key=label, label_visibility="collapsed")
 
             # === Input fields ===
-            input_metric("Matter Score (all time)", """1. Open the Matter App on your iPhone  
-            2. Tap **"You"** in the bottom menu  
-            3. Tap **"Stats"**  
-            4. Scroll to **Stats to Date**  
-            5. Find your **Matter Score**""")
+            # === Input fields ===
+            input_metric("Matter Score (all time)", """• Open the Matter App on your iPhone  
+            • Tap **"You"** in the bottom menu  
+            • Tap **"Stats"**  
+            • Scroll to **Stats to Date**  
+            • Find your **Matter Score**""")
             
             st.divider()
-            input_metric("Matter: Number of Memories", """1. Open the Matter App on your iPhone  
-            2. Tap **"You"** in the bottom menu  
-            3. Tap **"Stats"**  
-            4. Scroll to **Stats to Date**  
-            5. Find **Total Memories**""")
+            input_metric("Matter: Number of Memories", """• Open the Matter App on your iPhone  
+            • Tap **"You"** in the bottom menu  
+            • Tap **"Stats"**  
+            • Scroll to **Stats to Date**  
+            • Find **Total Memories**""")
             
             st.divider()
-            input_metric("Trudiagnostic: Estimated Telomere Age", """1. **Log in to** [login.trudiagnostic.com](https://login.trudiagnostic.com)  
-            2. Click **"My Reports"** in the left menu  
-            3. Open your **Telomere Length Report**  
-            4. Scroll to **Estimated Telomere Age**""")
+            input_metric("Trudiagnostic: Estimated Telomere Age", """• Log in to [login.trudiagnostic.com](https://login.trudiagnostic.com)  
+            • Click **"My Reports"** in the left menu  
+            • Open your **Telomere Length Report**  
+            • Scroll to **Estimated Telomere Age**""")
             
             st.divider()
-            input_metric("BioStarks: Longevity NAD+ Score", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
-            2. Look for your **Longevity Score** (0–100)""")
+            input_metric("BioStarks: Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            • Look for your **Longevity Score** (0–100)""")
             
             st.divider()
-            input_metric("BioStarks: NAD+ Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
-            2. Click your **Longevity Score**  
-            3. Hover over the **NAD+** hexagon  
-            4. Value will be shown in **ug/gHb**""")
+            input_metric("BioStarks: NAD+ Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            • Click your **Longevity Score**  
+            • Hover over the **NAD+** hexagon  
+            • Value will be shown in **ug/gHb**""")
             
             st.divider()
-            input_metric("BioStarks: Magnesium Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
-            2. Click your **Longevity Score**  
-            3. Hover over the **Mg** hexagon  
-            4. Value will be shown in **ug/gHb**""")
+            input_metric("BioStarks: Magnesium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            • Click your **Longevity Score**  
+            • Hover over the **Mg** hexagon  
+            • Value will be shown in **ug/gHb**""")
             
             st.divider()
-            input_metric("BioStarks: Selenium Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
-            2. Click your **Longevity Score**  
-            3. Hover over the **Se** hexagon  
-            4. Value will be shown in **ug/gHb**""")
+            input_metric("BioStarks: Selenium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            • Click your **Longevity Score**  
+            • Hover over the **Se** hexagon  
+            • Value will be shown in **ug/gHb**""")
             
             st.divider()
-            input_metric("BioStarks: Zinc Levels", """1. **Log in to** [results.biostarks.com](https://results.biostarks.com)  
-            2. Click your **Longevity Score**  
-            3. Hover over the **Zn** hexagon  
-            4. Value will be shown in **ug/gHb**""")
+            input_metric("BioStarks: Zinc Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            • Click your **Longevity Score**  
+            • Hover over the **Zn** hexagon  
+            • Value will be shown in **ug/gHb**""")
             
             st.divider()
-            input_metric("Hero: VO2 Max (best result)", """1. Open the Hero App on your iPhone  
-            2. Look for your highest **VO2 Max** result""")
+            input_metric("Hero: VO2 Max (best result)", """• Open the Hero App on your iPhone  
+            • Look for your highest **VO2 Max** result""")
             
             submitted = st.form_submit_button("Submit")
 
