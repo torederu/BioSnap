@@ -313,14 +313,14 @@ with tab1:
     # === If deletion is in progress, stop everything else ===
     if st.session_state.get("deleting_in_progress", False):
         with st.spinner("Deleting file from database..."):
-            st.session_state.pop("csv_ready", None)
-            st.session_state.pop("csv", None)
-            st.session_state.pop("df", None)
-            st.session_state.pop("csv_filename", None)
-            st.session_state.pop("supabase_uploaded", None)
+            st.session_state.pop("function_csv_ready", None)
+            st.session_state.pop("function_csv", None)
+            st.session_state.pop("function_df", None)
+            st.session_state.pop("function_csv_filename", None)
+            st.session_state.pop("function_supabase_uploaded", None)
             st.session_state.pop("function_email", None)
             st.session_state.pop("function_password", None)
-            
+
             try:
                 bucket = user_supabase.storage.from_("data")
                 bucket.remove([f"{username}/functionhealth.csv"])
@@ -350,10 +350,10 @@ with tab1:
                 st.error(f"Something went wrong while deleting your file: {e}")
 
     # === If data is loaded, show it ===
-    elif st.session_state.get("csv_ready") and "df" in st.session_state:
-        st.dataframe(st.session_state.df)
+    elif st.session_state.get("function_csv_ready") and "function_df" in st.session_state:
+        st.dataframe(st.session_state.function_df)
         st.success("Import successful!")
-    
+
         if st.button("Start Over"):
             st.session_state.deleting_in_progress = True
             st.rerun()
@@ -364,29 +364,28 @@ with tab1:
     <div style='font-size:17.5px; line-height:1.6'>
     Please enter your Function Health credentials to connect and download your data.
     </div>""", unsafe_allow_html=True)
-    
+
         st.markdown("""
     <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
     <strong>Your Information Stays Private:</strong> We do not store your credentials. They are used once to connect to Function Health to download your data, and then are immediately erased from memory.
     </div>""", unsafe_allow_html=True)
 
-
         with st.form("function_login_form"):
             user_email = st.text_input("Email", key="function_email")
             user_pass = st.text_input("Password", type="password", key="function_password")
             submitted = st.form_submit_button("Connect & Import Data")
-        
+
         if submitted:
             if not user_email or not user_pass:
                 st.error("Please enter email and password.")
                 st.stop()
-        
+
             st.session_state.pop("skip_restore", None)
             progress_bar = st.progress(0)
             status = st.empty()
-        
+
             try:
-                df = scrape_function_health(user_email, user_pass, status, progress_bar)
+                function_df = scrape_function_health(user_email, user_pass, status, progress_bar)
                 update_progress(status, progress_bar, "Deleting Function Health credentials from memory...", 98)
                 del user_email
                 del user_pass
@@ -396,44 +395,44 @@ with tab1:
                 status.empty()
                 progress_bar.empty()
 
-                csv_bytes = df.to_csv(index=False).encode()
-                st.session_state.csv = csv_bytes
-                st.session_state.df = df 
-                st.session_state.csv_filename = f"{username}_functionhealth.csv"
-                st.session_state.user_id = username
-                st.session_state.csv_file = csv_bytes
-        
+                function_csv_bytes = function_df.to_csv(index=False).encode()
+                st.session_state.function_csv = function_csv_bytes
+                st.session_state.function_df = function_df
+                st.session_state.function_csv_filename = f"{username}_functionhealth.csv"
+                st.session_state.function_csv_file = function_csv_bytes
+
                 # Upload to Supabase
-                filename = f"{username}/functionhealth.csv"
+                function_filename = f"{username}/functionhealth.csv"
                 bucket = user_supabase.storage.from_("data")
-        
+
                 try:
-                    bucket.remove([filename])
+                    bucket.remove([function_filename])
                 except Exception:
-                    pass 
-        
+                    pass
+
                 response = bucket.upload(
-                    path=filename,
-                    file=csv_bytes,
+                    path=function_filename,
+                    file=function_csv_bytes,
                     file_options={"content-type": "text/csv"}
                 )
-        
+
                 res_data = response.__dict__
                 if "error" in res_data and res_data["error"]:
                     st.error("Upload failed.")
                 else:
-                    st.session_state.supabase_uploaded = True
-        
-                st.session_state.to_initialize_csv = True
+                    st.session_state.function_supabase_uploaded = True
+
+                st.session_state.to_initialize_function_csv = True
                 st.rerun()
-        
+
             except ValueError as ve:
                 progress_bar.empty()
                 status.empty()
                 st.error(str(ve))
-        
+
             except Exception as e:
                 st.error(f"Scraping failed: {type(e).__name__} — {e}")
+
 
 with tab2:
     st.markdown("<h1>Prenuvo</h1>", unsafe_allow_html=True)
@@ -635,48 +634,44 @@ with tab3:
     testkit_filename = f"{username}/test_kits.csv"
     bucket = user_supabase.storage.from_("data")
 
-
     # === Load saved CSV if available — block ghost files
-    if "test_kit_df" not in st.session_state:
+    if "testkit_df" not in st.session_state:
         try:
-            file_bytes = bucket.download(testkit_filename)
+            testkit_bytes = bucket.download(testkit_filename)
             files = bucket.list(path=username)
             in_list = any(f["name"] == "test_kits.csv" for f in files)
-    
-            if file_bytes and len(file_bytes) > 0 and in_list:
-                st.session_state.test_kit_df = pd.read_csv(io.BytesIO(file_bytes))
-            else:
-                # File is either missing or ghosted — block it
-                st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
-        except Exception:
-            st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
 
+            if testkit_bytes and len(testkit_bytes) > 0 and in_list:
+                st.session_state.testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
+            else:
+                st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+        except Exception:
+            st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
 
     # === Handle Start Over ===
-    if st.session_state.get("reset_test_kit", False):
+    if st.session_state.get("reset_testkit", False):
         with st.spinner("Deleting file from database..."):
             try:
-                bucket.remove([testkit_filename]) 
-                st.session_state.file_deleted = True
+                bucket.remove([testkit_filename])
+                st.session_state.testkit_deleted = True
             except Exception as e:
                 st.warning(f"Failed to delete file: {e}")
-                st.session_state.file_deleted = False
+                st.session_state.testkit_deleted = False
 
-        # Clear relevant session state
-        for key in ["reset_test_kit", "testkit_submitted"]:
+        for key in ["reset_testkit", "testkit_submitted"]:
             st.session_state.pop(key, None)
 
-        st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+        st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
         st.rerun()
 
     # === If no data yet, show form ===
-    if st.session_state.test_kit_df.empty:
+    if st.session_state.testkit_df.empty:
         st.markdown("""
         <div style='font-size:17.5px; line-height:1.6'>
         Please complete the fields below using your latest data from each app or test kit.<br><br>
         </div>""", unsafe_allow_html=True)
 
-        with st.form("test_kit_form", border=True):
+        with st.form("testkit_form", border=True):
 
             def input_metric(label, expander_text):
                 with st.container():
@@ -692,60 +687,58 @@ with tab3:
                 st.text_input(label, key=label, label_visibility="collapsed")
 
             # === Input fields ===
-            # === Input fields ===
             input_metric("Matter Score (all time)", """• Open the Matter App on your iPhone  
             • Tap **"You"** in the bottom menu  
             • Tap **"Stats"**  
             • Scroll to **Stats to Date**  
             • Find your **Matter Score**""")
-            
+
             st.divider()
             input_metric("Matter: Number of Memories", """• Open the Matter App on your iPhone  
             • Tap **"You"** in the bottom menu  
             • Tap **"Stats"**  
             • Scroll to **Stats to Date**  
             • Find **Total Memories**""")
-            
+
             st.divider()
             input_metric("Trudiagnostic: Estimated Telomere Age", """• Log in to [login.trudiagnostic.com](https://login.trudiagnostic.com)  
             • Click **"My Reports"** in the left menu  
             • Open your **Telomere Length Report**  
             • Scroll to **Estimated Telomere Age**""")
-            
+
             st.divider()
             input_metric("BioStarks: Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Look for your **Longevity Score** (0–100)""")
-            
+
             st.divider()
             input_metric("BioStarks: NAD+ Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **NAD+** hexagon  
             • Value will be shown in **ug/gHb**""")
-            
+
             st.divider()
             input_metric("BioStarks: Magnesium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Mg** hexagon  
             • Value will be shown in **ug/gHb**""")
-            
+
             st.divider()
             input_metric("BioStarks: Selenium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Se** hexagon  
             • Value will be shown in **ug/gHb**""")
-            
+
             st.divider()
             input_metric("BioStarks: Zinc Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Zn** hexagon  
             • Value will be shown in **ug/gHb**""")
-            
+
             st.divider()
             input_metric("Hero: VO2 Max (best result)", """• Open the Hero App on your iPhone  
             • Look for your highest **VO2 Max** result""")
-            
-            submitted = st.form_submit_button("Submit")
 
+            submitted = st.form_submit_button("Submit")
 
         required_keys = [
             "Matter Score (all time)",
@@ -758,14 +751,13 @@ with tab3:
             "BioStarks: Zinc Levels",
             "Hero: VO2 Max (best result)",
         ]
-        #required_keys = [] 
 
         if submitted:
             missing = [k for k in required_keys if not st.session_state.get(k, "").strip()]
             if missing:
                 st.error("Please complete all required fields before submitting.")
             else:
-                df = pd.DataFrame([
+                testkit_df = pd.DataFrame([
                     ["Matter", "Matter Score (all time)", st.session_state["Matter Score (all time)"]],
                     ["Matter", "Number of Memories", st.session_state["Matter: Number of Memories"]],
                     ["Trudiagnostic", "Estimated Telomere Age", st.session_state["Trudiagnostic: Estimated Telomere Age"]],
@@ -778,8 +770,8 @@ with tab3:
                 ], columns=["Test Kit or App", "Metric", "Value"])
 
                 with st.spinner("Saving to database..."):
-                    st.session_state.test_kit_df = df
-                    csv_bytes = df.to_csv(index=False).encode()
+                    st.session_state.testkit_df = testkit_df
+                    testkit_csv_bytes = testkit_df.to_csv(index=False).encode()
 
                     try:
                         bucket.remove([testkit_filename])
@@ -788,7 +780,7 @@ with tab3:
 
                     bucket.upload(
                         path=testkit_filename,
-                        file=csv_bytes,
+                        file=testkit_csv_bytes,
                         file_options={"content-type": "text/csv"}
                     )
 
@@ -798,21 +790,22 @@ with tab3:
 
     # === If data exists, show table and start over ===
     else:
-        st.dataframe(st.session_state.test_kit_df)
+        st.dataframe(st.session_state.testkit_df)
         st.success("Upload successful!")
 
         if st.button("Start Over", key="reset_testkit"):
-            st.session_state.reset_test_kit = True
+            st.session_state.reset_testkit = True
             st.rerun()
+
 
 with tab4:
     st.markdown("## Behavioral Data")
-    behavior_file = f"{username}/behavioral_scores.csv"
+    behavior_scores_file = f"{username}/behavioral_scores.csv"
     try:
-        behavior_bytes = user_supabase.storage.from_("data").download(behavior_file)
-        if isinstance(behavior_bytes, bytes):
-            behavior_df = pd.read_csv(io.BytesIO(behavior_bytes))
-            st.dataframe(behavior_df)
+        behavior_scores_bytes = user_supabase.storage.from_("data").download(behavior_scores_file)
+        if isinstance(behavior_scores_bytes, bytes):
+            behavior_scores_df = pd.read_csv(io.BytesIO(behavior_scores_bytes))
+            st.dataframe(behavior_scores_df)
         else:
             st.info("Please add your behavioral data.")
     except Exception as e:
@@ -823,35 +816,32 @@ with tab4:
             st.warning("There was an error retrieving your behavioral data. Please contact admin.")
 
     st.markdown("## Oregon Data")
-    behavior_file = f"{username}/Oregon.csv"
+    oregon_file = f"{username}/Oregon.csv"
     try:
-        behavior_bytes = user_supabase.storage.from_("data").download(behavior_file)
-        if isinstance(behavior_bytes, bytes):
-            behavior_df = pd.read_csv(io.BytesIO(behavior_bytes))
-            st.dataframe(behavior_df)
+        oregon_bytes = user_supabase.storage.from_("data").download(oregon_file)
+        if isinstance(oregon_bytes, bytes):
+            oregon_df = pd.read_csv(io.BytesIO(oregon_bytes))
+            st.dataframe(oregon_df)
         else:
-            st.info("Please add your behavioral data.")
+            st.info("Please add your Oregon data.")
     except Exception as e:
         error_msg = str(e).lower()
         if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please add your behavioral data.")
+            st.info("Please add your Oregon data.")
         else:
-            st.warning("There was an error retrieving your behavioral data. Please contact admin.")
+            st.warning("There was an error retrieving your Oregon data. Please contact admin.")
 
     st.markdown("## Function Health Data")
-
-    filename = f"{username}/functionhealth.csv"
+    fh_file = f"{username}/functionhealth.csv"
     bucket = user_supabase.storage.from_("data")
 
     try:
-        file_bytes = bucket.download(filename)
-
-        if isinstance(file_bytes, bytes):
-            df = pd.read_csv(io.BytesIO(file_bytes))
-            st.dataframe(df)
+        fh_bytes = bucket.download(fh_file)
+        if isinstance(fh_bytes, bytes):
+            fh_df = pd.read_csv(io.BytesIO(fh_bytes))
+            st.dataframe(fh_df)
         else:
             st.info("Please add your Function Health data.")
-
     except Exception as e:
         error_msg = str(e).lower()
         if "not found" in error_msg or "no such file" in error_msg:
@@ -861,38 +851,34 @@ with tab4:
 
     st.markdown("## Prenuvo Data")
     prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
-    
     try:
-        file_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
-        if isinstance(file_bytes, bytes):
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
+        prenuvo_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
+        if isinstance(prenuvo_bytes, bytes):
+            doc = fitz.open(stream=prenuvo_bytes, filetype="pdf")
             page_images = [
                 page.get_pixmap(dpi=150).tobytes("png")
                 for page in doc
                 if page.get_text().strip()
             ]
             doc.close()
-    
-            # Convert each image to base64 HTML
+
             img_html_blocks = []
             for i, img_bytes in enumerate(page_images):
                 b64_img = base64.b64encode(img_bytes).decode()
                 img_html_blocks.append(f"<img src='data:image/png;base64,{b64_img}' style='width:100%; margin-bottom: 1.5rem;'/>")
-    
+
             scrollable_html = f"""
             <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
                 {''.join(img_html_blocks)}
             </div>
             """
-    
+
             components.html(scrollable_html, height=670, scrolling=False)
-    
+
         else:
             st.info("Please add your Prenuvo data.")
     except Exception as e:
         st.info("Please add your Prenuvo data.")
-
-
 
     st.markdown("## Test Kit & App Data")
     testkit_file = f"{username}/test_kits.csv"
@@ -909,3 +895,4 @@ with tab4:
             st.info("Please add your Test Kit & App data.")
         else:
             st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
+
