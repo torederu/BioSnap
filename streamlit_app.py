@@ -116,14 +116,14 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
 
-    #service = Service(ChromeDriverManager().install())
+    service = Service(ChromeDriverManager().install())
     
-    try:
-        service = Service("/usr/bin/chromedriver") 
-        options.add_argument(f"--binary=/usr/bin/chromium") 
-    except Exception as e:
-        print(f"Error setting up Selenium Service: {e}")
-        raise 
+    # try:
+    #     service = Service("/usr/bin/chromedriver") 
+    #     options.add_argument(f"--binary=/usr/bin/chromium") 
+    # except Exception as e:
+    #     print(f"Error setting up Selenium Service: {e}")
+    #     raise 
         
     driver = None
 
@@ -267,22 +267,28 @@ if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imp
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Test Kits & Apps", "All Data", "Interventions"])
 
-# === Try to restore saved CSV ===
-if not st.session_state.get("csv_ready") and not st.session_state.get("skip_restore"):
+# === Try to restore saved CSV (stateless ghost-block logic)
+if not st.session_state.get("csv_ready"):
     try:
         bucket = user_supabase.storage.from_("data")
         filename = f"{username}/functionhealth.csv"
         res = bucket.download(filename)
+        files = bucket.list(path=f"{username}/")
+        in_list = any(f["name"] == "functionhealth.csv" for f in files)
 
-        if res and len(res) > 0:
+        # === Ghost file — block it
+        if res and len(res) > 0 and not in_list:
+            st.session_state.csv_ready = False
+        elif res and len(res) > 0:
             df = pd.read_csv(io.BytesIO(res))
             st.session_state.csv = res
             st.session_state.df = df
             st.session_state.csv_ready = True
         else:
             st.session_state.csv_ready = False
-    except Exception as e:
+    except Exception:
         st.session_state.csv_ready = False
+
 
 with tab1:
     st.markdown("<h1>Function Health</h1>", unsafe_allow_html=True)
@@ -416,75 +422,75 @@ with tab2:
     filename = f"{username}/redacted_prenuvo_report.pdf"
     bucket = user_supabase.storage.from_("data")
 
+    file_exists = False
+    file_bytes = None
+
     # === Handle Start Over
     if st.session_state.get("reset_prenuvo", False):
         st.session_state.pop("reset_prenuvo", None)
-    
-        for k in ["approved_redaction", "issue_submitted", "show_report_box", "redacted_pdf_for_review"]:
+
+        for k in [
+            "approved_redaction",
+            "issue_submitted",
+            "show_report_box",
+            "redacted_pdf_for_review",
+        ]:
             st.session_state.pop(k, None)
-    
+
         st.session_state.deleting_prenuvo = True
-    
+
         with st.spinner("Deleting file from database..."):
             try:
                 bucket.remove([filename])
             except:
                 st.warning("File deletion failed.")
-    
-        st.rerun()
-    
-    # === Check deletion status if needed
-    if st.session_state.get("deleting_prenuvo"):
-        try:
-            files = bucket.list(path=username)
-            file_still_there = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
-        except:
-            file_still_there = True  # Assume it's still there if error
-    
-        if not file_still_there:
-            # File deletion confirmed — now allow re-upload
+                st.session_state.pop("deleting_prenuvo", None)
+                st.stop()
+
+            for _ in range(20):
+                try:
+                    files = bucket.list(path=username)
+                    file_in_list = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
+                except:
+                    file_in_list = True
+                if not file_in_list:
+                    break
+                time.sleep(3)
+
+            # Done deleting — rerun to refresh logic
             st.session_state.pop("deleting_prenuvo", None)
-            st.session_state.file_deleted = True
-            file_exists = False
-            file_bytes = None
+            st.rerun()
+
+    # === Try to load the file and check ghost status (always stateless)
+    try:
+        file_bytes = bucket.download(filename)
+        file_is_downloadable = isinstance(file_bytes, bytes)
+
+        files = bucket.list(path=username)
+        file_in_list = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
+
+        if file_is_downloadable and file_in_list:
+            file_exists = True
+            st.session_state.approved_redaction = True
         else:
-            # Still deleting — show status, suppress viewer
-            st.info("Waiting for deletion to complete...")
+            # Ghost file or fully deleted — block render
             file_exists = False
             file_bytes = None
-    
-    # === Try loading redacted file if not in deletion check
-    elif "deleting_prenuvo" not in st.session_state:
-        try:
-            file_bytes = bucket.download(filename)
-            if isinstance(file_bytes, bytes):
-                file_exists = True
-                st.session_state.approved_redaction = True
-            else:
-                file_exists = False
-                file_bytes = None
-        except:
-            file_exists = False
-            file_bytes = None
+    except:
+        file_exists = False
+        file_bytes = None
 
-    # If not from Supabase or not yet approved, check session state for the redacted file ready for review
-    if (
-        not file_exists and 
-        "redacted_pdf_for_review" in st.session_state and 
-        not st.session_state.get("deleting_prenuvo")
-    ):
+    # === Fallback to redacted PDF in session (if not already approved)
+    if not file_exists and "redacted_pdf_for_review" in st.session_state:
         file_bytes = st.session_state.redacted_pdf_for_review
-        
-        # If we're displaying from session state, it means it's not yet approved in Supabase
-        st.session_state.approved_redaction = False 
-        file_exists = True # Indicate that we have bytes to display
+        st.session_state.approved_redaction = False
+        file_exists = True
 
+    # === Display PDF if available
     if file_exists:
-        # If approved_redaction not yet set and we loaded from Supabase, set it now so success message persists
-        if "approved_redaction" not in st.session_state and file_exists:
+        if "approved_redaction" not in st.session_state:
             st.session_state.approved_redaction = True
 
-        # --- Display instructions BEFORE PDF viewer if pending approval ---
         if not st.session_state.get("approved_redaction"):
             st.markdown("""
                 <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
@@ -493,37 +499,32 @@ with tab2:
             """, unsafe_allow_html=True)
 
             base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-
             st.markdown(f"""
-            <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
-            <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_prenuvo_report.pdf">Click here to download the redacted report.</a><br>
-            Or scroll through the preview below to review each page.
-            </div>
+                <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
+                <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_prenuvo_report.pdf">Click here to download the redacted report.</a><br>
+                Or scroll through the preview below to review each page.
+                </div>
             """, unsafe_allow_html=True)
 
-        # === PDF Viewer ===
-        # Convert PDF bytes to images
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         page_images = [
             page.get_pixmap(dpi=150).tobytes("png")
             for page in doc
-            if page.get_text().strip()  # skip empty pages
+            if page.get_text().strip()
         ]
         doc.close()
-        
-        # Encode all images as base64
-        img_html_blocks = []
-        for i, img_bytes in enumerate(page_images):
-            b64_img = base64.b64encode(img_bytes).decode()
-            img_html_blocks.append(f"<img src='data:image/png;base64,{b64_img}' style='width:100%; margin-bottom: 1.5rem;'/>")
-        
-        # Combine into one scrollable HTML block
+
+        img_html_blocks = [
+            f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
+            for img in page_images
+        ]
+
         scrollable_html = f"""
         <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
             {''.join(img_html_blocks)}
         </div>
         """
-        
+
         components.html(scrollable_html, height=670, scrolling=False)
 
         if st.session_state.get("approved_redaction"):
@@ -531,7 +532,7 @@ with tab2:
             if st.button("Start Over", key="start_over_after_approve"):
                 st.session_state.reset_prenuvo = True
                 st.rerun()
-        else: # This block now only contains the buttons and issue form for pending approval
+        else:
             if st.button("Approve Redaction", key="approve_redaction"):
                 with st.spinner("Saving redacted file..."):
                     try:
@@ -553,7 +554,6 @@ with tab2:
                 st.session_state.reset_prenuvo = True
                 st.rerun()
 
-        # Issue form
         if st.session_state.get("show_report_box") and not st.session_state.get("issue_submitted"):
             issue = st.text_area("Describe the issue with redaction:")
             if st.button("Submit Issue", key="submit_issue"):
@@ -571,7 +571,6 @@ with tab2:
             st.success("Issue submitted.")
 
     else:
-        # Upload instructions
         st.markdown("<div style='font-size:17.5px; line-height:1.6'>Please upload your Prenuvo Physician Report:</div>", unsafe_allow_html=True)
         st.markdown("""
         <div style='font-size:15px; line-height:1.6; margin-bottom:0.5rem; padding-left:1.5rem'>
@@ -596,41 +595,50 @@ with tab2:
                 os.remove(input_path)
                 with open(output_path, "rb") as f:
                     pdf_bytes = f.read()
-                os.remove(output_path) 
+                os.remove(output_path)
 
                 st.session_state.redacted_pdf_for_review = pdf_bytes
-                
+
                 try:
                     bucket.remove([filename])
                 except:
-                    pass 
+                    pass
 
-                st.session_state.pop("file_deleted", None)
-                st.session_state.pop("approved_redaction", None)
-                st.session_state.pop("issue_submitted", None)
-                st.session_state.pop("show_report_box", None)
-                
+                for k in ["prenuvo_file_deleted", "approved_redaction", "issue_submitted", "show_report_box"]:
+                    st.session_state.pop(k, None)
+
                 time.sleep(1.5)
                 st.rerun()
+
+
 with tab3:
     st.markdown("<h1>Test Kits & Apps</h1>", unsafe_allow_html=True)
 
     testkit_filename = f"{username}/test_kits.csv"
     bucket = user_supabase.storage.from_("data")
 
-    # === Load saved CSV if available ===
+
+    # === Load saved CSV if available — block ghost files
     if "test_kit_df" not in st.session_state:
         try:
             file_bytes = bucket.download(testkit_filename)
-            st.session_state.test_kit_df = pd.read_csv(io.BytesIO(file_bytes))
+            files = bucket.list(path=username)
+            in_list = any(f["name"] == "test_kits.csv" for f in files)
+    
+            if file_bytes and len(file_bytes) > 0 and in_list:
+                st.session_state.test_kit_df = pd.read_csv(io.BytesIO(file_bytes))
+            else:
+                # File is either missing or ghosted — block it
+                st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
         except Exception:
             st.session_state.test_kit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+
 
     # === Handle Start Over ===
     if st.session_state.get("reset_test_kit", False):
         with st.spinner("Deleting file from database..."):
             try:
-                bucket.remove([testkit_filename])  # no .get() needed
+                bucket.remove([testkit_filename]) 
                 st.session_state.file_deleted = True
             except Exception as e:
                 st.warning(f"Failed to delete file: {e}")
