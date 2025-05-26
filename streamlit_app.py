@@ -57,12 +57,11 @@ elif auth_status:
 if auth_status:
     user_data_dir = f"data/{username}"
 
-    if st.session_state.pop("to_initialize_csv", False):
-        st.session_state.csv_ready = True
+    if st.session_state.pop("to_initialize_function_csv", False):
+        st.session_state.function_csv_ready = True
         st.session_state.just_imported = True
         st.rerun()
 
-# SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
 
 # Secure environment values
@@ -116,15 +115,12 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
     options.add_argument("--no-sandbox")
     options.add_argument("--window-size=1920x1080")
 
-    service = Service(ChromeDriverManager().install())
-    
-    # try:
-    #     service = Service("/usr/bin/chromedriver") 
-    #     options.add_argument(f"--binary=/usr/bin/chromium") 
-    # except Exception as e:
-    #     print(f"Error setting up Selenium Service: {e}")
-    #     raise 
-        
+    try:
+        service = Service(ChromeDriverManager().install())
+    except Exception:
+        service = Service("/usr/bin/chromedriver")
+        options.add_argument("--binary=/usr/bin/chromium")
+
     driver = None
 
     try:
@@ -146,7 +142,7 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
         time.sleep(5)
         if "login" in driver.current_url.lower():
             raise ValueError("Login failed — please check your Function Health credentials.")
-        
+
         driver.get("https://my.functionhealth.com/biomarkers")
 
         if status:
@@ -258,7 +254,6 @@ def redact_prenuvo_pdf(input_path, output_path):
     doc.save(output_path)
     doc.close()
 
-
 # === Streamlit App ===
 user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SERVICE_KEY"))
 
@@ -266,6 +261,29 @@ if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imp
     st.rerun()
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Test Kits & Apps", "All Data", "Interventions"])
+
+# === Try to restore saved CSV (stateless ghost-block logic)
+if not st.session_state.get("function_csv_ready"):
+    try:
+        bucket = user_supabase.storage.from_("data")
+        function_filename = f"{username}/functionhealth.csv"
+        res = bucket.download(function_filename)
+        files = bucket.list(path=f"{username}/")
+        in_list = any(f["name"] == "functionhealth.csv" for f in files)
+
+        # === Ghost file — block it
+        if res and len(res) > 0 and not in_list:
+            st.session_state.function_csv_ready = False
+        elif res and len(res) > 0:
+            function_df = pd.read_csv(io.BytesIO(res))
+            st.session_state.function_csv = res
+            st.session_state.function_df = function_df
+            st.session_state.function_csv_ready = True
+        else:
+            st.session_state.function_csv_ready = False
+    except Exception:
+        st.session_state.function_csv_ready = False
+
 
 # === Try to restore saved CSV (stateless ghost-block logic)
 if not st.session_state.get("csv_ready"):
