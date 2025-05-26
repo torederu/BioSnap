@@ -83,23 +83,25 @@ if "supabase_user_checked" not in st.session_state:
         user_exists = any(u.email == account_id for u in users)
 
         if not user_exists:
-            user = admin_supabase.auth.admin.create_user({
-                "email": account_id,
-                "password": access_key,
-                "user_metadata": {"glcid": glc_id},
-                "options": {
-                    "email_confirm": True
-                }
-            })
-            st.session_state.supabase_uid = user.user.id
-            st.success("Supabase user created.")
+            try:
+                user = admin_supabase.auth.admin.create_user({
+                    "email": account_id,
+                    "password": access_key,
+                    "user_metadata": {"glcid": glc_id},
+                    "options": {"email_confirm": True}
+                })
+                st.session_state.supabase_uid = user.user.id
+            except Exception as create_err:
+                if "already been registered" not in str(create_err).lower():
+                    raise create_err  # Only raise if it's not a duplicate error
 
         st.session_state.supabase_user_checked = True
 
-    except Exception as e:
-        st.error(f"User lookup or creation failed: {e}")
+    except Exception:
+        st.warning("Supabase user setup failed. Please try again later.")
+        st.stop()
 
-# === Function to update progress bar ===
+# === Function to update Function Health progress bar ===
 def update_progress(status, bar, message, percent):
     if status:
         status.write(message)
@@ -229,7 +231,7 @@ def redact_prenuvo_pdf(input_path, output_path):
     patterns = [
         r"Time of scan:\s?.*",
         r"Sex:\s?.*",
-        r"\b(Male|Female|Other|Non-Binary|Transgender)\b",
+        r"\b(Male|Female|Other|Non-Binary|Transgender|Intersex)\b",
         r"Height:\s?.*",
         r"Weight:\s?.*",
         r"Date of Birth:\s?.*",
@@ -263,7 +265,7 @@ user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SER
 if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imported", False):
     st.rerun()
 
-tab1, tab2, tab3, tab4 = st.tabs(["Function Health", "Prenuvo", "Test Kits & Apps", "All Data"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Test Kits & Apps", "All Data", "Interventions"])
 
 # === Try to restore saved CSV ===
 if not st.session_state.get("csv_ready") and not st.session_state.get("skip_restore"):
@@ -417,33 +419,60 @@ with tab2:
     # === Handle Start Over
     if st.session_state.get("reset_prenuvo", False):
         st.session_state.pop("reset_prenuvo", None)
+    
+        for k in ["approved_redaction", "issue_submitted", "show_report_box", "redacted_pdf_for_review"]:
+            st.session_state.pop(k, None)
+    
+        st.session_state.deleting_prenuvo = True
+    
         with st.spinner("Deleting file from database..."):
             try:
                 bucket.remove([filename])
-                st.session_state.file_deleted = True
             except:
                 st.warning("File deletion failed.")
-            for k in ["approved_redaction", "issue_submitted", "show_report_box", "redacted_pdf_for_review"]:
-                st.session_state.pop(k, None)
-            time.sleep(1.5)
-            st.rerun()
-
-    # === Try loading redacted file
-    file_exists = False
-    file_bytes = None
     
-    # Always try to load from Supabase first
-    try:
-        file_bytes = bucket.download(filename)
-        if isinstance(file_bytes, bytes):
-            file_exists = True
-            st.session_state.approved_redaction = True  # <-- persist success
-    except:
-        file_exists = False
-
+        st.rerun()
+    
+    # === Check deletion status if needed
+    if st.session_state.get("deleting_prenuvo"):
+        try:
+            files = bucket.list(path=username)
+            file_still_there = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
+        except:
+            file_still_there = True  # Assume it's still there if error
+    
+        if not file_still_there:
+            # File deletion confirmed — now allow re-upload
+            st.session_state.pop("deleting_prenuvo", None)
+            st.session_state.file_deleted = True
+            file_exists = False
+            file_bytes = None
+        else:
+            # Still deleting — show status, suppress viewer
+            st.info("Waiting for deletion to complete...")
+            file_exists = False
+            file_bytes = None
+    
+    # === Try loading redacted file if not in deletion check
+    elif "deleting_prenuvo" not in st.session_state:
+        try:
+            file_bytes = bucket.download(filename)
+            if isinstance(file_bytes, bytes):
+                file_exists = True
+                st.session_state.approved_redaction = True
+            else:
+                file_exists = False
+                file_bytes = None
+        except:
+            file_exists = False
+            file_bytes = None
 
     # If not from Supabase or not yet approved, check session state for the redacted file ready for review
-    if not file_exists and "redacted_pdf_for_review" in st.session_state:
+    if (
+        not file_exists and 
+        "redacted_pdf_for_review" in st.session_state and 
+        not st.session_state.get("deleting_prenuvo")
+    ):
         file_bytes = st.session_state.redacted_pdf_for_review
         
         # If we're displaying from session state, it means it's not yet approved in Supabase
@@ -472,7 +501,6 @@ with tab2:
             </div>
             """, unsafe_allow_html=True)
 
-
         # === PDF Viewer ===
         # Convert PDF bytes to images
         doc = fitz.open(stream=file_bytes, filetype="pdf")
@@ -497,7 +525,6 @@ with tab2:
         """
         
         components.html(scrollable_html, height=670, scrolling=False)
-
 
         if st.session_state.get("approved_redaction"):
             st.success("Upload successful!")
@@ -837,7 +864,7 @@ with tab4:
         else:
             st.info("Please add your Prenuvo data.")
     except Exception as e:
-        st.warning(f"Error loading file: {e}")
+        st.info("Please add your Prenuvo data.")
 
 
 
