@@ -688,23 +688,54 @@ with tab3:
 
             # === Input fields ===
             input_metric("Matter Score (all time)", """• Open the Matter App on your iPhone  
-            • Tap **"You"** in the bottom menu  
-            • Tap **"Stats"**  
+            • Tap **\"You\"** in the bottom menu  
+            • Tap **\"Stats\"**  
             • Scroll to **Stats to Date**  
             • Find your **Matter Score**""")
 
             st.divider()
-            input_metric("Matter: Number of Memories", """• Open the Matter App on your iPhone  
-            • Tap **"You"** in the bottom menu  
-            • Tap **"Stats"**  
+            input_metric("Matter: # of Memories", """• Open the Matter App on your iPhone  
+            • Tap **\"You\"** in the bottom menu  
+            • Tap **\"Stats\"**  
             • Scroll to **Stats to Date**  
             • Find **Total Memories**""")
 
             st.divider()
-            input_metric("Trudiagnostic: Estimated Telomere Age", """• Log in to [login.trudiagnostic.com](https://login.trudiagnostic.com)  
-            • Click **"My Reports"** in the left menu  
-            • Open your **Telomere Length Report**  
-            • Scroll to **Estimated Telomere Age**""")
+            input_metric("Matter: # of Good Days", """• Open the Matter App on your iPhone  
+            • Tap **\"You\"** in the bottom menu  
+            • Tap **\"Stats\"**  
+            • Scroll to **Stats to Date**  
+            • Find your # of **Good Days**""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Dopamine", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Dopamine**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Serotonin", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Serotonin**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Oxytocin", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Oxytocin**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Cannabinoids", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Cannabinoids**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Opioids", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Opioids**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
+
+            st.divider()
+            input_metric("Matter: # Memories with Testosterone", """• Open the Matter App on your iPhone  
+            • On the home screen, find the box labeled **Testosterone**  
+            • Look for the number in the **gray circle** at the top-left corner of the box""")
 
             st.divider()
             input_metric("BioStarks: Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
@@ -742,8 +773,14 @@ with tab3:
 
         required_keys = [
             "Matter Score (all time)",
-            "Matter: Number of Memories",
-            "Trudiagnostic: Estimated Telomere Age",
+            "Matter: # of Memories",
+            "Matter: # of Good Days",
+            "Matter: # Memories with Dopamine",
+            "Matter: # Memories with Serotonin",
+            "Matter: # Memories with Oxytocin",
+            "Matter: # Memories with Cannabinoids",
+            "Matter: # Memories with Opioids",
+            "Matter: # Memories with Testosterone",
             "BioStarks: Longevity NAD+ Score",
             "BioStarks: NAD+ Levels",
             "BioStarks: Magnesium Levels",
@@ -759,7 +796,14 @@ with tab3:
             else:
                 testkit_df = pd.DataFrame([
                     ["Matter", "Matter Score (all time)", st.session_state["Matter Score (all time)"]],
-                    ["Matter", "Number of Memories", st.session_state["Matter: Number of Memories"]],
+                    ["Matter", "# of Memories", st.session_state["Matter: # of Memories"]],
+                    ["Matter", "# of Good Days", st.session_state["Matter: # of Good Days"]],
+                    ["Matter", "# Memories with Dopamine", st.session_state["Matter: # Memories with Dopamine"]],
+                    ["Matter", "# Memories with Serotonin", st.session_state["Matter: # Memories with Serotonin"]],
+                    ["Matter", "# Memories with Oxytocin", st.session_state["Matter: # Memories with Oxytocin"]],
+                    ["Matter", "# Memories with Cannabinoids", st.session_state["Matter: # Memories with Cannabinoids"]],
+                    ["Matter", "# Memories with Opioids", st.session_state["Matter: # Memories with Opioids"]],
+                    ["Matter", "# Memories with Testosterone", st.session_state["Matter: # Memories with Testosterone"]],
                     ["Trudiagnostic", "Estimated Telomere Age", st.session_state["Trudiagnostic: Estimated Telomere Age"]],
                     ["BioStarks", "Longevity NAD+ Score", st.session_state["BioStarks: Longevity NAD+ Score"]],
                     ["BioStarks", "NAD+ Levels", st.session_state["BioStarks: NAD+ Levels"]],
@@ -768,6 +812,7 @@ with tab3:
                     ["BioStarks", "Zinc Levels", st.session_state["BioStarks: Zinc Levels"]],
                     ["Hero", "VO2 Max (best result)", st.session_state["Hero: VO2 Max (best result)"]],
                 ], columns=["Test Kit or App", "Metric", "Value"])
+
 
                 with st.spinner("Saving to database..."):
                     st.session_state.testkit_df = testkit_df
