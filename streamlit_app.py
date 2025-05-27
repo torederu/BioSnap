@@ -212,7 +212,7 @@ def scrape_function_health(user_email, user_pass, status=None, progress_bar=None
 
     return pd.DataFrame(data)
 
-# === Redaction Function ===
+# === Prenuvo Redaction Function ===
 def redact_prenuvo_pdf(input_path, output_path):
     doc = fitz.open(input_path)
 
@@ -260,7 +260,7 @@ user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SER
 if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imported", False):
     st.rerun()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Test Kits & Apps", "All Data", "Interventions"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Trudiagnostic", "Test Kits & Apps", "All Data"])
 
 # === Try to restore saved CSV (stateless ghost-block logic)
 if not st.session_state.get("function_csv_ready"):
@@ -628,7 +628,7 @@ with tab2:
                 st.rerun()
 
 
-with tab3:
+with tab4:
     st.markdown("<h1>Test Kits & Apps</h1>", unsafe_allow_html=True)
 
     testkit_filename = f"{username}/test_kits.csv"
@@ -841,8 +841,228 @@ with tab3:
             st.session_state.reset_testkit = True
             st.rerun()
 
+with tab3:
+    def redact_trudiagnostic_pdf(input_path, output_path):    
+        doc = fitz.open(input_path)
+        patterns = [
+            r"(Tem Orederu)",  # fallback in case name is present explicitly
+            r"(Name:?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+            r"(Sex:?\s?[^\s]+)",
+            r"(Gender:?\s?[^\s]+)",
+            r"\bAge:?\s?\d{1,3}\b",
+            r"(ID#:?\s?[A-Z0-9]+)",
+            r"(Collection Date:?\s?\d{2}/\d{2}/\d{4})",
+            r"(Report Date:?\s?\d{2}/\d{2}/\d{4})",
+            r"(DOB:?\s?\d{2}/\d{2}/\d{4})",
+            r"(Patient:?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
+            r"(https?://[^\s]+)", 
+        ]
+    
+        for page in doc:
+            text = page.get_text()
+            for pattern in patterns:
+                matches = re.findall(pattern, text)
+                for match in matches:
+                    rects = page.search_for(match)
+                    for rect in rects:
+                        page.add_redact_annot(rect, fill=(0, 0, 0))
+            page.apply_redactions()
+    
+        doc.save(output_path)
+        doc.close()
 
-with tab4:
+    
+    st.markdown("<h1>Trudiagnostic</h1>", unsafe_allow_html=True)
+    filename = f"{username}/redacted_trudiagnostic_report.pdf"
+    bucket = user_supabase.storage.from_("data")
+
+    file_exists = False
+    file_bytes = None
+
+    # === Handle Start Over
+    if st.session_state.get("reset_trudiagnostic", False):
+        st.session_state.pop("reset_trudiagnostic", None)
+
+        for k in [
+            "approved_trudiagnostic",
+            "trudiagnostic_issue_submitted",
+            "trudiagnostic_show_report_box",
+            "trudiagnostic_pdf_for_review",
+        ]:
+            st.session_state.pop(k, None)
+
+        st.session_state.deleting_trudiagnostic = True
+
+        with st.spinner("Deleting file from database..."):
+            try:
+                bucket.remove([filename])
+            except:
+                st.warning("File deletion failed.")
+                st.session_state.pop("deleting_trudiagnostic", None)
+                st.stop()
+
+            for _ in range(20):
+                try:
+                    files = bucket.list(path=username)
+                    file_in_list = any(f["name"] == "redacted_trudiagnostic_report.pdf" for f in files)
+                except:
+                    file_in_list = True
+                if not file_in_list:
+                    break
+                time.sleep(3)
+
+            st.session_state.pop("deleting_trudiagnostic", None)
+            st.rerun()
+
+    try:
+        file_bytes = bucket.download(filename)
+        file_is_downloadable = isinstance(file_bytes, bytes)
+        files = bucket.list(path=username)
+        file_in_list = any(f["name"] == "redacted_trudiagnostic_report.pdf" for f in files)
+
+        if file_is_downloadable and file_in_list:
+            file_exists = True
+            st.session_state.approved_trudiagnostic = True
+        else:
+            file_exists = False
+            file_bytes = None
+    except:
+        file_exists = False
+        file_bytes = None
+
+    if not file_exists and "trudiagnostic_pdf_for_review" in st.session_state:
+        file_bytes = st.session_state.trudiagnostic_pdf_for_review
+        st.session_state.approved_trudiagnostic = False
+        file_exists = True
+
+    if file_exists:
+        if "approved_trudiagnostic" not in st.session_state:
+            st.session_state.approved_trudiagnostic = True
+
+        if not st.session_state.get("approved_trudiagnostic"):
+            st.markdown("""
+                <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
+                <strong>Please Review Your Redacted Report:</strong> Browse through each page to ensure sensitive information has been removed. Click "Approve Redaction" to save the file to your account.
+                </div>
+            """, unsafe_allow_html=True)
+
+            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+            st.markdown(f"""
+                <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
+                <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_trudiagnostic_report.pdf">Click here to download the redacted report.</a><br>
+                Or scroll through the preview below to review each page.
+                </div>
+            """, unsafe_allow_html=True)
+
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        page_images = [
+            page.get_pixmap(dpi=150).tobytes("png")
+            for page in doc
+            if page.get_text().strip()
+        ]
+        doc.close()
+
+        img_html_blocks = [
+            f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
+            for img in page_images
+        ]
+
+        scrollable_html = f"""
+        <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
+            {''.join(img_html_blocks)}
+        </div>
+        """
+
+        components.html(scrollable_html, height=670, scrolling=False)
+
+        if st.session_state.get("approved_trudiagnostic"):
+            st.success("Upload successful!")
+            if st.button("Start Over", key="start_over_trudiagnostic_approved"):
+                st.session_state.reset_trudiagnostic = True
+                st.rerun()
+        else:
+            if st.button("Approve Redaction", key="approve_trudiagnostic"):
+                with st.spinner("Saving redacted file..."):
+                    try:
+                        bucket.upload(filename, file_bytes, {"content-type": "application/pdf"})
+                        st.session_state.approved_trudiagnostic = True
+                        st.session_state.pop("trudiagnostic_pdf_for_review", None)
+                        st.session_state.pop("trudiagnostic_issue_submitted", None)
+                        st.session_state.pop("trudiagnostic_show_report_box", None)
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to save redacted file: {e}")
+
+            if st.button("Report an Issue", key="report_trudiagnostic_issue"):
+                st.session_state.trudiagnostic_show_report_box = True
+                st.session_state.pop("trudiagnostic_issue_submitted", None)
+
+            if st.button("Start Over", key="start_over_trudiagnostic_before_approve"):
+                st.session_state.reset_trudiagnostic = True
+                st.rerun()
+
+        if st.session_state.get("trudiagnostic_show_report_box") and not st.session_state.get("trudiagnostic_issue_submitted"):
+            issue = st.text_area("Describe the issue with redaction:")
+            if st.button("Submit Issue", key="submit_trudiagnostic_issue"):
+                timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S-%f")
+                bucket.upload(
+                    f"{username}/issues/issue_{timestamp}.txt",
+                    issue.encode("utf-8"),
+                    {"content-type": "text/plain"}
+                )
+                st.session_state.trudiagnostic_issue_submitted = True
+                st.session_state.pop("trudiagnostic_show_report_box", None)
+                st.rerun()
+
+        if st.session_state.get("trudiagnostic_issue_submitted"):
+            st.success("Issue submitted.")
+
+    else:
+        st.markdown("<div style='font-size:17.5px; line-height:1.6'>Please upload your Trudiagnostic Provider Summary:</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:15px; line-height:1.6; margin-bottom:0.5rem; padding-left:1.5rem'>
+          <ol style="margin-top: 0; margin-bottom: 0;">
+            <li>Log in to <a href='https://login.trudiagnostic.com/' target='_blank'>Trudiagnostic</a></li>
+            <li>Click <strong>"Reports"</strong> in the left menu bar</li>
+            <li>Open the <strong>"Provider Summary Report"</strong></li>
+            <li>Click <strong>"Print"</strong> in the top right corner</li>
+            <li>In the print window, choose <strong>"Save as PDF"</strong> as the destination<br>
+            <span style='font-size: 0.95em;'>(On Macs, select “PDF” in the dropdown menu. On Windows, choose “Microsoft Print to PDF” as your printer.)</span></li>
+            <li>Save the file to your computer</li>
+            <li>Upload it below</li>
+          </ol>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='font-size:17.5px; line-height:1.6'>We will redact sensitive information and prepare a version for your review.</div>", unsafe_allow_html=True)
+
+        uploaded = st.file_uploader("", type="pdf", key="trudiagnostic_upload")
+        if uploaded:
+            with st.spinner("Redacting sensitive information..."):
+                input_path = "/tmp/trudiagnostic_original.pdf"
+                output_path = "/tmp/trudiagnostic_redacted.pdf"
+                with open(input_path, "wb") as f:
+                    f.write(uploaded.read())
+                redact_trudiagnostic_pdf(input_path, output_path)
+                os.remove(input_path)
+                with open(output_path, "rb") as f:
+                    pdf_bytes = f.read()
+                os.remove(output_path)
+
+                st.session_state.trudiagnostic_pdf_for_review = pdf_bytes
+
+                try:
+                    bucket.remove([filename])
+                except:
+                    pass
+
+                for k in ["approved_trudiagnostic", "trudiagnostic_issue_submitted", "trudiagnostic_show_report_box"]:
+                    st.session_state.pop(k, None)
+
+                time.sleep(1.5)
+                st.rerun()
+
+with tab5:
     st.markdown("## Behavioral Data")
     behavior_scores_file = f"{username}/behavioral_scores.csv"
     try:
@@ -906,10 +1126,10 @@ with tab4:
             ]
             doc.close()
 
-            img_html_blocks = []
-            for i, img_bytes in enumerate(page_images):
-                b64_img = base64.b64encode(img_bytes).decode()
-                img_html_blocks.append(f"<img src='data:image/png;base64,{b64_img}' style='width:100%; margin-bottom: 1.5rem;'/>")
+            img_html_blocks = [
+                f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
+                for img in page_images
+            ]
 
             scrollable_html = f"""
             <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
@@ -918,11 +1138,40 @@ with tab4:
             """
 
             components.html(scrollable_html, height=670, scrolling=False)
-
         else:
             st.info("Please add your Prenuvo data.")
     except Exception as e:
         st.info("Please add your Prenuvo data.")
+
+    st.markdown("## Trudiagnostic Data")
+    trudiagnostic_pdf_path = f"{username}/redacted_trudiagnostic_report.pdf"
+    try:
+        trudiagnostic_bytes = user_supabase.storage.from_("data").download(trudiagnostic_pdf_path)
+        if isinstance(trudiagnostic_bytes, bytes):
+            doc = fitz.open(stream=trudiagnostic_bytes, filetype="pdf")
+            page_images = [
+                page.get_pixmap(dpi=150).tobytes("png")
+                for page in doc
+                if page.get_text().strip()
+            ]
+            doc.close()
+
+            img_html_blocks = [
+                f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
+                for img in page_images
+            ]
+
+            scrollable_html = f"""
+            <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
+                {''.join(img_html_blocks)}
+            </div>
+            """
+
+            components.html(scrollable_html, height=670, scrolling=False)
+        else:
+            st.info("Please add your Trudiagnostic data.")
+    except Exception as e:
+        st.info("Please add your Trudiagnostic data.")
 
     st.markdown("## Test Kit & App Data")
     testkit_file = f"{username}/test_kits.csv"
@@ -939,4 +1188,129 @@ with tab4:
             st.info("Please add your Test Kit & App data.")
         else:
             st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
+
+# with tab6:
+#     st.markdown("""
+#     ## Intervention Plan
+
+#     Use this space to design your personalized 8-week intervention plan. 
+#     Choose which domains you'd like to focus on, then describe the specific actions you'll commit to. 
+#     Your plan will be saved and viewable any time you return.
+#     """, unsafe_allow_html=True)
+
+#     focus_areas = [
+#         "Emotional Wellbeing",
+#         "Mental Fitness",
+#         "Physical Fitness",
+#         "Metabolic Fitness",
+#         "Sleep",
+#         "Addiction Dependency"
+#     ]
+
+#     examples = {
+#         "Emotional Wellbeing": "Example: Morning walks in nature 3x/week to discover silent spots. Weekend trips to scenic places.",
+#         "Mental Fitness": "Example: Daily Nuroe working memory game. Weekly cognitive training exercises.",
+#         "Physical Fitness": "Example: Add 1–2 60-90 minute GA1 endurance sessions per week.",
+#         "Metabolic Fitness": "Example: Supplement Fe, Zn, Mg, NMN+. Reduce sugar. Aim for HbA1c < 6.5.",
+#         "Sleep": "Example: Set 10:30 PM bedtime, limit screen use after 9 PM, take magnesium glycinate.",
+#         "Addiction Dependency": "Example: Reduce phone or social media use. Replace late-night scrolling with journaling. Limit alcohol to 1x/week. Track urges daily."
+#     }
+
+#     if "intervention_step" not in st.session_state:
+#         st.session_state.intervention_step = "select_areas"
+
+#     if st.session_state.intervention_step == "select_areas":
+#         st.markdown("### Choose your focus areas")
+#         with st.form("intervention_focus_area_form"):
+#             selected = st.multiselect("Select areas to focus on:", focus_areas, default=st.session_state.get("intervention_selected_areas", []))
+#             proceed = st.form_submit_button("Next")
+#             if proceed:
+#                 st.session_state.intervention_selected_areas = selected
+#                 st.session_state.intervention_step = "enter_plans"
+#                 st.rerun()
+
+#     elif st.session_state.intervention_step == "enter_plans" and "intervention_plan_df" not in st.session_state:
+#         st.markdown("### Describe Your Plans")
+
+#         with st.spinner("Loading plan fields..."):
+#             with st.form("intervention_plan_entry_form"):
+#                 plans = {}
+#                 for area in st.session_state.intervention_selected_areas:
+#                     plans[area] = st.text_area(
+#                         f"Plan for {area}",
+#                         key=f"plan_{area}",
+#                         placeholder=examples.get(area, f"What do you want to do to improve your {area.lower()} over the next 8 weeks?")
+#                     )
+#                 submitted = st.form_submit_button("Save My Plan")
+
+#             if submitted:
+#                 import pandas as pd
+#                 import io
+#                 from datetime import datetime
+
+#                 plan_df = pd.DataFrame([(k, v) for k, v in plans.items()], columns=["Category", "Plan"])
+#                 st.session_state.intervention_plan_df = plan_df
+
+#                 # Save to Supabase
+#                 csv_bytes = plan_df.to_csv(index=False).encode()
+#                 plan_filename = f"{username}/intervention_plan.csv"
+#                 bucket = user_supabase.storage.from_("data")
+
+#                 try:
+#                     bucket.remove([plan_filename])
+#                 except:
+#                     pass
+
+#                 bucket.upload(
+#                     path=plan_filename,
+#                     file=csv_bytes,
+#                     file_options={"content-type": "text/csv"}
+#                 )
+
+#                 st.session_state.intervention_plan_timestamp = datetime.utcnow().strftime("%B %d, %Y")
+#                 st.success("Your plan has been saved!")
+#                 st.rerun()
+
+#     # Load plan from Supabase if not already in session
+#     if "intervention_plan_df" not in st.session_state:
+#         try:
+#             plan_filename = f"{username}/intervention_plan.csv"
+#             metadata = user_supabase.storage.from_("data").list(username)
+#             matching = next((f for f in metadata if f["name"] == "intervention_plan.csv"), None)
+#             if matching and "updated_at" in matching:
+#                 import pandas as pd
+#                 import io
+#                 from dateutil import parser
+#                 st.session_state.intervention_plan_timestamp = parser.parse(matching["updated_at"]).strftime("%B %d, %Y")
+#             bytes_data = user_supabase.storage.from_("data").download(plan_filename)
+#             if isinstance(bytes_data, bytes):
+#                 df = pd.read_csv(io.BytesIO(bytes_data))
+#                 st.session_state.intervention_plan_df = df
+#         except:
+#             pass
+
+#     # Show previously saved plan if exists
+#     if "intervention_plan_df" in st.session_state:
+#         timestamp = st.session_state.get("intervention_plan_timestamp")
+#         if timestamp:
+#             st.markdown(f"### Your Plan (Saved on {timestamp})")
+#         else:
+#             st.markdown("### Your Saved Plan")
+#         st.dataframe(st.session_state.intervention_plan_df)
+
+#         if st.button("Start Over"):
+#             plan_filename = f"{username}/intervention_plan.csv"
+#             bucket = user_supabase.storage.from_("data")
+#             try:
+#                 bucket.remove([plan_filename])
+#             except:
+#                 pass
+#             for key in [
+#                 "intervention_step",
+#                 "intervention_selected_areas",
+#                 "intervention_plan_df",
+#                 "intervention_plan_timestamp"
+#             ]:
+#                 st.session_state.pop(key, None)
+#             st.rerun()
 
