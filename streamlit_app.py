@@ -804,7 +804,6 @@ with tab3:
                     ["Matter", "# Memories with Cannabinoids", st.session_state["Matter: # Memories with Cannabinoids"]],
                     ["Matter", "# Memories with Opioids", st.session_state["Matter: # Memories with Opioids"]],
                     ["Matter", "# Memories with Testosterone", st.session_state["Matter: # Memories with Testosterone"]],
-                    ["Trudiagnostic", "Estimated Telomere Age", st.session_state["Trudiagnostic: Estimated Telomere Age"]],
                     ["BioStarks", "Longevity NAD+ Score", st.session_state["BioStarks: Longevity NAD+ Score"]],
                     ["BioStarks", "NAD+ Levels", st.session_state["BioStarks: NAD+ Levels"]],
                     ["BioStarks", "Magnesium Levels", st.session_state["BioStarks: Magnesium Levels"]],
