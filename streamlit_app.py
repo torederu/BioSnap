@@ -439,89 +439,35 @@ with tab2:
     filename = f"{username}/redacted_prenuvo_report.pdf"
     bucket = user_supabase.storage.from_("data")
 
-    file_exists = False
-    file_bytes = None
+    file_list = bucket.list(path=username)
+    file_exists = any(f["name"] == "redacted_prenuvo_report.pdf" for f in file_list)
 
-    # === Handle Start Over
-    if st.session_state.get("reset_prenuvo", False):
-        st.session_state.pop("reset_prenuvo", None)
-
-        for k in [
-            "approved_redaction",
-            "issue_submitted",
-            "show_report_box",
-            "redacted_pdf_for_review",
-        ]:
-            st.session_state.pop(k, None)
-
-        st.session_state.deleting_prenuvo = True
-
-        with st.spinner("Deleting file from database..."):
-            try:
-                bucket.remove([filename])
-            except:
-                st.warning("File deletion failed.")
-                st.session_state.pop("deleting_prenuvo", None)
-                st.stop()
-
-            for _ in range(20):
-                try:
-                    files = bucket.list(path=username)
-                    file_in_list = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
-                except:
-                    file_in_list = True
-                if not file_in_list:
-                    break
-                time.sleep(3)
-
-            # Done deleting — rerun to refresh logic
-            st.session_state.pop("deleting_prenuvo", None)
-            st.rerun()
-
-    # === Try to load the file and check ghost status (always stateless)
-    try:
-        file_bytes = bucket.download(filename)
-        file_is_downloadable = isinstance(file_bytes, bytes)
-
-        files = bucket.list(path=username)
-        file_in_list = any(f["name"] == "redacted_prenuvo_report.pdf" for f in files)
-
-        if file_is_downloadable and file_in_list:
-            file_exists = True
-            st.session_state.approved_redaction = True
-        else:
-            # Ghost file or fully deleted — block render
-            file_exists = False
-            file_bytes = None
-    except:
-        file_exists = False
-        file_bytes = None
-
-    # === Fallback to redacted PDF in session (if not already approved)
-    if not file_exists and "redacted_pdf_for_review" in st.session_state:
-        file_bytes = st.session_state.redacted_pdf_for_review
-        st.session_state.approved_redaction = False
-        file_exists = True
-
-    # === Display PDF if available
     if file_exists:
-        if "approved_redaction" not in st.session_state:
-            st.session_state.approved_redaction = True
+        st.success("Your report was successfully redacted and saved!")
+        try:
+            pdf_bytes = bucket.download(filename)
+            if isinstance(pdf_bytes, bytes):
+                st.download_button("Download Report", pdf_bytes, file_name="redacted_prenuvo_report.pdf")
+            else:
+                st.error("Failed to retrieve the file. Please try again.")
+        except Exception as e:
+            st.error(f"Error retrieving file: {e}")
 
-        if not st.session_state.get("approved_redaction"):
-            st.markdown("""
-                <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
-                <strong>Please Review Your Redacted Report:</strong> Browse through each page to ensure sensitive information has been removed. Click "Approve Redaction" to save the file to your account.
-                </div>
-            """, unsafe_allow_html=True)
+    elif "redacted_pdf_for_review" in st.session_state:
+        file_bytes = st.session_state.redacted_pdf_for_review
+        st.markdown("""
+            <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
+            <strong>Please Review Your Redacted Report:</strong> Browse through each page to ensure sensitive information has been removed. Click "Approve Redaction" to save the file to your account.
+            </div>
+        """, unsafe_allow_html=True)
 
-            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-            st.markdown(f"""
-                <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
-                <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_prenuvo_report.pdf">Click here to download the redacted report.</a><br>
-                Or scroll through the preview below to review each page.
-                </div>
-            """, unsafe_allow_html=True)
+        base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+        st.markdown(f"""
+            <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
+            <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_prenuvo_report.pdf">Click here to download your redacted report.</a><br>
+            Or scroll through the preview below to review each page.
+            </div>
+        """, unsafe_allow_html=True)
 
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         page_images = [
@@ -544,32 +490,21 @@ with tab2:
 
         components.html(scrollable_html, height=670, scrolling=False)
 
-        if st.session_state.get("approved_redaction"):
-            st.success("Upload successful!")
-            if st.button("Start Over", key="start_over_after_approve"):
-                st.session_state.reset_prenuvo = True
-                st.rerun()
-        else:
-            if st.button("Approve Redaction", key="approve_redaction"):
-                with st.spinner("Saving redacted file..."):
-                    try:
-                        bucket.upload(filename, file_bytes, {"content-type": "application/pdf"})
-                        st.session_state.approved_redaction = True
-                        st.session_state.pop("redacted_pdf_for_review", None)
-                        st.session_state.pop("issue_submitted", None)
-                        st.session_state.pop("show_report_box", None)
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to save redacted file: {e}")
+        if st.button("Approve Redaction", key="approve_redaction"):
+            with st.spinner("Saving redacted file..."):
+                try:
+                    bucket.upload(filename, file_bytes, {"content-type": "application/pdf"})
+                    st.session_state.pop("redacted_pdf_for_review", None)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save redacted file: {e}")
 
-            if st.button("Report an Issue", key="report_issue"):
-                st.session_state.show_report_box = True
-                st.session_state.pop("issue_submitted", None)
+        if st.button("Report an Issue", key="report_issue"):
+            st.session_state.show_report_box = True
 
-            if st.button("Start Over", key="start_over_before_approve"):
-                st.session_state.reset_prenuvo = True
-                st.rerun()
+        if st.button("Start Over", key="start_over_before_approve"):
+            st.session_state.pop("redacted_pdf_for_review", None)
+            st.rerun()
 
         if st.session_state.get("show_report_box") and not st.session_state.get("issue_submitted"):
             issue = st.text_area("Describe the issue with redaction:")
@@ -616,14 +551,177 @@ with tab2:
 
                 st.session_state.redacted_pdf_for_review = pdf_bytes
 
-                try:
-                    bucket.remove([filename])
-                except:
-                    pass
-
-                for k in ["prenuvo_file_deleted", "approved_redaction", "issue_submitted", "show_report_box"]:
+                for k in ["approved_redaction", "issue_submitted", "show_report_box"]:
                     st.session_state.pop(k, None)
 
+                time.sleep(1.5)
+                st.rerun()
+
+
+with tab3:
+    def redact_trudiagnostic_pdf(input_path, output_path):
+        doc = fitz.open(input_path)
+
+        for i, page in enumerate(doc):
+            # === Page 1 logic: redact name (above age), and demographic blocks
+            if i == 0:
+                body_patterns = [
+                    r"Sex:\s*\w+",
+                    r"Age:\s*\d+",
+                    r"https?://[^\s]+",
+                    r"www\.[^\s]+"
+                ]
+
+                for pattern in body_patterns:
+                    matches = re.finditer(pattern, page.get_text())
+                    for match in matches:
+                        matched_text = match.group()
+                        for rect in page.search_for(matched_text):
+                            page.add_redact_annot(rect, fill=(0, 0, 0))
+
+                text_blocks = page.get_text("blocks")
+                for j, block in enumerate(text_blocks):
+                    if "Age:" in block[4]:
+                        if j > 0:
+                            name_block = text_blocks[j - 1]
+                            rect = fitz.Rect(name_block[:4])
+                            page.add_redact_annot(rect, fill=(0, 0, 0))
+                        break
+
+                for block in text_blocks:
+                    text = block[4]
+                    if any(keyword in text for keyword in ["ID#:", "Collected:", "Reported:"]):
+                        rect = fitz.Rect(block[:4])
+                        page.add_redact_annot(rect, fill=(0, 0, 0))
+
+            # === Footer cleanup on all pages
+            for block in page.get_text("blocks"):
+                if "PROVIDED BY:" in block[4] or "trudiagnostic.com" in block[4] or "trudiagnostic/apireports.aspx" in block[4]:
+                    rect = fitz.Rect(block[:4])
+                    page.add_redact_annot(rect, fill=(0, 0, 0))
+
+            page.apply_redactions()
+
+        doc.save(output_path)
+        doc.close()
+
+    st.markdown("<h1>Trudiagnostic</h1>", unsafe_allow_html=True)
+    filename = f"{username}/redacted_trudiagnostic_report.pdf"
+    bucket = user_supabase.storage.from_("data")
+
+    file_list = bucket.list(path=username)
+    file_exists = any(f["name"] == "redacted_trudiagnostic_report.pdf" for f in file_list)
+
+    if file_exists:
+        st.success("Your report was successfully redacted and saved!")
+        try:
+            pdf_bytes = bucket.download(filename)
+            if isinstance(pdf_bytes, bytes):
+                st.download_button("Download Report", pdf_bytes, file_name="redacted_trudiagnostic_report.pdf")
+            else:
+                st.error("Failed to retrieve the file. Please try again.")
+        except Exception as e:
+            st.error(f"Error retrieving file: {e}")
+    elif "trudiagnostic_pdf_for_review" in st.session_state:
+        file_bytes = st.session_state.trudiagnostic_pdf_for_review
+        st.markdown("""
+            <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
+            <strong>Please Review Your Redacted Report:</strong> Browse through each page to ensure sensitive information has been removed. Click "Approve Redaction" to save the file to your account.
+            </div>
+        """, unsafe_allow_html=True)
+
+        base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
+        st.markdown(f"""
+            <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
+            <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_trudiagnostic_report.pdf">Click here to download your redacted report.</a><br>
+            Or scroll through the preview below to review each page.
+            </div>
+        """, unsafe_allow_html=True)
+
+        doc = fitz.open(stream=file_bytes, filetype="pdf")
+        page_images = [
+            page.get_pixmap(dpi=150).tobytes("png")
+            for page in doc
+            if page.get_text().strip()
+        ]
+        doc.close()
+
+        img_html_blocks = [
+            f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
+            for img in page_images
+        ]
+
+        scrollable_html = f"""
+        <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
+            {''.join(img_html_blocks)}
+        </div>
+        """
+
+        components.html(scrollable_html, height=670, scrolling=False)
+
+        if st.button("Approve Redaction", key="approve_trudiagnostic"):
+            with st.spinner("Saving redacted file..."):
+                try:
+                    bucket.upload(filename, file_bytes, {"content-type": "application/pdf"})
+                    st.session_state.pop("trudiagnostic_pdf_for_review", None)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to save redacted file: {e}")
+
+        if st.button("Report an Issue", key="report_trudiagnostic_issue"):
+            st.session_state.trudiagnostic_show_report_box = True
+
+        if st.button("Start Over", key="start_over_trudiagnostic_before_approve"):
+            st.session_state.pop("trudiagnostic_pdf_for_review", None)
+            st.rerun()
+
+        if st.session_state.get("trudiagnostic_show_report_box") and not st.session_state.get("trudiagnostic_issue_submitted"):
+            issue = st.text_area("Describe the issue with redaction:")
+            if st.button("Submit Issue", key="submit_trudiagnostic_issue"):
+                timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S-%f")
+                bucket.upload(
+                    f"{username}/issues/issue_{timestamp}.txt",
+                    issue.encode("utf-8"),
+                    {"content-type": "text/plain"}
+                )
+                st.session_state.trudiagnostic_issue_submitted = True
+                st.session_state.pop("trudiagnostic_show_report_box", None)
+                st.rerun()
+
+        if st.session_state.get("trudiagnostic_issue_submitted"):
+            st.success("Issue submitted.")
+    else:
+        st.markdown("<div style='font-size:17.5px; line-height:1.6'>Please upload your Trudiagnostic Provider Summary:</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:15px; line-height:1.6; margin-bottom:0.5rem; padding-left:1.5rem'>
+          <ol style="margin-top: 0; margin-bottom: 0;">
+            <li>Log in to <a href='https://login.trudiagnostic.com/' target='_blank'>Trudiagnostic</a></li>
+            <li>Click <strong>"Reports"</strong> in the left menu bar</li>
+            <li>Open the <strong>"Provider Summary Report"</strong></li>
+            <li>Click <strong>"Print"</strong> in the top right corner</li>
+            <li>In the print window, choose <strong>"Save as PDF"</strong> as the destination<br>
+            <span style='font-size: 0.95em;'>(On Macs, select “PDF” in the dropdown menu. On Windows, choose “Microsoft Print to PDF” as your printer.)</span></li>
+            <li>Save the file to your computer</li>
+            <li>Upload it below</li>
+          </ol>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<div style='font-size:17.5px; line-height:1.6'>We will redact sensitive information and prepare a version for your review.</div>", unsafe_allow_html=True)
+
+        uploaded = st.file_uploader("", type="pdf", key="trudiagnostic_upload")
+        if uploaded:
+            with st.spinner("Redacting sensitive information..."):
+                input_path = "/tmp/trudiagnostic_original.pdf"
+                output_path = "/tmp/trudiagnostic_redacted.pdf"
+                with open(input_path, "wb") as f:
+                    f.write(uploaded.read())
+                redact_trudiagnostic_pdf(input_path, output_path)
+                os.remove(input_path)
+                with open(output_path, "rb") as f:
+                    pdf_bytes = f.read()
+                os.remove(output_path)
+
+                st.session_state.trudiagnostic_pdf_for_review = pdf_bytes
                 time.sleep(1.5)
                 st.rerun()
 
@@ -841,227 +939,6 @@ with tab4:
             st.session_state.reset_testkit = True
             st.rerun()
 
-with tab3:
-    def redact_trudiagnostic_pdf(input_path, output_path):    
-        doc = fitz.open(input_path)
-        patterns = [
-            r"(Tem Orederu)",  # fallback in case name is present explicitly
-            r"(Name:?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
-            r"(Sex:?\s?[^\s]+)",
-            r"(Gender:?\s?[^\s]+)",
-            r"\bAge:?\s?\d{1,3}\b",
-            r"(ID#:?\s?[A-Z0-9]+)",
-            r"(Collection Date:?\s?\d{2}/\d{2}/\d{4})",
-            r"(Report Date:?\s?\d{2}/\d{2}/\d{4})",
-            r"(DOB:?\s?\d{2}/\d{2}/\d{4})",
-            r"(Patient:?\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)",
-            r"(https?://[^\s]+)", 
-        ]
-    
-        for page in doc:
-            text = page.get_text()
-            for pattern in patterns:
-                matches = re.findall(pattern, text)
-                for match in matches:
-                    rects = page.search_for(match)
-                    for rect in rects:
-                        page.add_redact_annot(rect, fill=(0, 0, 0))
-            page.apply_redactions()
-    
-        doc.save(output_path)
-        doc.close()
-
-    
-    st.markdown("<h1>Trudiagnostic</h1>", unsafe_allow_html=True)
-    filename = f"{username}/redacted_trudiagnostic_report.pdf"
-    bucket = user_supabase.storage.from_("data")
-
-    file_exists = False
-    file_bytes = None
-
-    # === Handle Start Over
-    if st.session_state.get("reset_trudiagnostic", False):
-        st.session_state.pop("reset_trudiagnostic", None)
-
-        for k in [
-            "approved_trudiagnostic",
-            "trudiagnostic_issue_submitted",
-            "trudiagnostic_show_report_box",
-            "trudiagnostic_pdf_for_review",
-        ]:
-            st.session_state.pop(k, None)
-
-        st.session_state.deleting_trudiagnostic = True
-
-        with st.spinner("Deleting file from database..."):
-            try:
-                bucket.remove([filename])
-            except:
-                st.warning("File deletion failed.")
-                st.session_state.pop("deleting_trudiagnostic", None)
-                st.stop()
-
-            for _ in range(20):
-                try:
-                    files = bucket.list(path=username)
-                    file_in_list = any(f["name"] == "redacted_trudiagnostic_report.pdf" for f in files)
-                except:
-                    file_in_list = True
-                if not file_in_list:
-                    break
-                time.sleep(3)
-
-            st.session_state.pop("deleting_trudiagnostic", None)
-            st.rerun()
-
-    try:
-        file_bytes = bucket.download(filename)
-        file_is_downloadable = isinstance(file_bytes, bytes)
-        files = bucket.list(path=username)
-        file_in_list = any(f["name"] == "redacted_trudiagnostic_report.pdf" for f in files)
-
-        if file_is_downloadable and file_in_list:
-            file_exists = True
-            st.session_state.approved_trudiagnostic = True
-        else:
-            file_exists = False
-            file_bytes = None
-    except:
-        file_exists = False
-        file_bytes = None
-
-    if not file_exists and "trudiagnostic_pdf_for_review" in st.session_state:
-        file_bytes = st.session_state.trudiagnostic_pdf_for_review
-        st.session_state.approved_trudiagnostic = False
-        file_exists = True
-
-    if file_exists:
-        if "approved_trudiagnostic" not in st.session_state:
-            st.session_state.approved_trudiagnostic = True
-
-        if not st.session_state.get("approved_trudiagnostic"):
-            st.markdown("""
-                <div style='font-size:17.5px; line-height:1.6; margin-top:0.5rem; margin-bottom:1.5rem;'>
-                <strong>Please Review Your Redacted Report:</strong> Browse through each page to ensure sensitive information has been removed. Click "Approve Redaction" to save the file to your account.
-                </div>
-            """, unsafe_allow_html=True)
-
-            base64_pdf = base64.b64encode(file_bytes).decode("utf-8")
-            st.markdown(f"""
-                <div style='font-size:17.5px; line-height:1.6; margin-bottom:1rem;'>
-                <a href="data:application/pdf;base64,{base64_pdf}" download="redacted_trudiagnostic_report.pdf">Click here to download the redacted report.</a><br>
-                Or scroll through the preview below to review each page.
-                </div>
-            """, unsafe_allow_html=True)
-
-        doc = fitz.open(stream=file_bytes, filetype="pdf")
-        page_images = [
-            page.get_pixmap(dpi=150).tobytes("png")
-            for page in doc
-            if page.get_text().strip()
-        ]
-        doc.close()
-
-        img_html_blocks = [
-            f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
-            for img in page_images
-        ]
-
-        scrollable_html = f"""
-        <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
-            {''.join(img_html_blocks)}
-        </div>
-        """
-
-        components.html(scrollable_html, height=670, scrolling=False)
-
-        if st.session_state.get("approved_trudiagnostic"):
-            st.success("Upload successful!")
-            if st.button("Start Over", key="start_over_trudiagnostic_approved"):
-                st.session_state.reset_trudiagnostic = True
-                st.rerun()
-        else:
-            if st.button("Approve Redaction", key="approve_trudiagnostic"):
-                with st.spinner("Saving redacted file..."):
-                    try:
-                        bucket.upload(filename, file_bytes, {"content-type": "application/pdf"})
-                        st.session_state.approved_trudiagnostic = True
-                        st.session_state.pop("trudiagnostic_pdf_for_review", None)
-                        st.session_state.pop("trudiagnostic_issue_submitted", None)
-                        st.session_state.pop("trudiagnostic_show_report_box", None)
-                        time.sleep(1)
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Failed to save redacted file: {e}")
-
-            if st.button("Report an Issue", key="report_trudiagnostic_issue"):
-                st.session_state.trudiagnostic_show_report_box = True
-                st.session_state.pop("trudiagnostic_issue_submitted", None)
-
-            if st.button("Start Over", key="start_over_trudiagnostic_before_approve"):
-                st.session_state.reset_trudiagnostic = True
-                st.rerun()
-
-        if st.session_state.get("trudiagnostic_show_report_box") and not st.session_state.get("trudiagnostic_issue_submitted"):
-            issue = st.text_area("Describe the issue with redaction:")
-            if st.button("Submit Issue", key="submit_trudiagnostic_issue"):
-                timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H-%M-%S-%f")
-                bucket.upload(
-                    f"{username}/issues/issue_{timestamp}.txt",
-                    issue.encode("utf-8"),
-                    {"content-type": "text/plain"}
-                )
-                st.session_state.trudiagnostic_issue_submitted = True
-                st.session_state.pop("trudiagnostic_show_report_box", None)
-                st.rerun()
-
-        if st.session_state.get("trudiagnostic_issue_submitted"):
-            st.success("Issue submitted.")
-
-    else:
-        st.markdown("<div style='font-size:17.5px; line-height:1.6'>Please upload your Trudiagnostic Provider Summary:</div>", unsafe_allow_html=True)
-        st.markdown("""
-        <div style='font-size:15px; line-height:1.6; margin-bottom:0.5rem; padding-left:1.5rem'>
-          <ol style="margin-top: 0; margin-bottom: 0;">
-            <li>Log in to <a href='https://login.trudiagnostic.com/' target='_blank'>Trudiagnostic</a></li>
-            <li>Click <strong>"Reports"</strong> in the left menu bar</li>
-            <li>Open the <strong>"Provider Summary Report"</strong></li>
-            <li>Click <strong>"Print"</strong> in the top right corner</li>
-            <li>In the print window, choose <strong>"Save as PDF"</strong> as the destination<br>
-            <span style='font-size: 0.95em;'>(On Macs, select “PDF” in the dropdown menu. On Windows, choose “Microsoft Print to PDF” as your printer.)</span></li>
-            <li>Save the file to your computer</li>
-            <li>Upload it below</li>
-          </ol>
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("<div style='font-size:17.5px; line-height:1.6'>We will redact sensitive information and prepare a version for your review.</div>", unsafe_allow_html=True)
-
-        uploaded = st.file_uploader("", type="pdf", key="trudiagnostic_upload")
-        if uploaded:
-            with st.spinner("Redacting sensitive information..."):
-                input_path = "/tmp/trudiagnostic_original.pdf"
-                output_path = "/tmp/trudiagnostic_redacted.pdf"
-                with open(input_path, "wb") as f:
-                    f.write(uploaded.read())
-                redact_trudiagnostic_pdf(input_path, output_path)
-                os.remove(input_path)
-                with open(output_path, "rb") as f:
-                    pdf_bytes = f.read()
-                os.remove(output_path)
-
-                st.session_state.trudiagnostic_pdf_for_review = pdf_bytes
-
-                try:
-                    bucket.remove([filename])
-                except:
-                    pass
-
-                for k in ["approved_trudiagnostic", "trudiagnostic_issue_submitted", "trudiagnostic_show_report_box"]:
-                    st.session_state.pop(k, None)
-
-                time.sleep(1.5)
-                st.rerun()
-
 with tab5:
     st.markdown("## Behavioral Data")
     behavior_scores_file = f"{username}/behavioral_scores.csv"
@@ -1118,26 +995,8 @@ with tab5:
     try:
         prenuvo_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
         if isinstance(prenuvo_bytes, bytes):
-            doc = fitz.open(stream=prenuvo_bytes, filetype="pdf")
-            page_images = [
-                page.get_pixmap(dpi=150).tobytes("png")
-                for page in doc
-                if page.get_text().strip()
-            ]
-            doc.close()
-
-            img_html_blocks = [
-                f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
-                for img in page_images
-            ]
-
-            scrollable_html = f"""
-            <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
-                {''.join(img_html_blocks)}
-            </div>
-            """
-
-            components.html(scrollable_html, height=670, scrolling=False)
+            b64 = base64.b64encode(prenuvo_bytes).decode()
+            st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_prenuvo_report.pdf'>Click here to download your redacted Prenuvo report.</a>", unsafe_allow_html=True)
         else:
             st.info("Please add your Prenuvo data.")
     except Exception as e:
@@ -1148,26 +1007,8 @@ with tab5:
     try:
         trudiagnostic_bytes = user_supabase.storage.from_("data").download(trudiagnostic_pdf_path)
         if isinstance(trudiagnostic_bytes, bytes):
-            doc = fitz.open(stream=trudiagnostic_bytes, filetype="pdf")
-            page_images = [
-                page.get_pixmap(dpi=150).tobytes("png")
-                for page in doc
-                if page.get_text().strip()
-            ]
-            doc.close()
-
-            img_html_blocks = [
-                f"<img src='data:image/png;base64,{base64.b64encode(img).decode()}' style='width:100%; margin-bottom: 1.5rem;'/>"
-                for img in page_images
-            ]
-
-            scrollable_html = f"""
-            <div style='height:650px; overflow-y:scroll; border:1px solid #ccc; padding:12px; background-color:#f9f9f9;'>
-                {''.join(img_html_blocks)}
-            </div>
-            """
-
-            components.html(scrollable_html, height=670, scrolling=False)
+            b64 = base64.b64encode(trudiagnostic_bytes).decode()
+            st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_trudiagnostic_report.pdf'>Click here to download your redacted Trudiagnostic report.</a>", unsafe_allow_html=True)
         else:
             st.info("Please add your Trudiagnostic data.")
     except Exception as e:
@@ -1188,6 +1029,7 @@ with tab5:
             st.info("Please add your Test Kit & App data.")
         else:
             st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
+
 
 # with tab6:
 #     st.markdown("""
