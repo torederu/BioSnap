@@ -260,7 +260,7 @@ user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SER
 if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imported", False):
     st.rerun()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Trudiagnostic", "Test Kits & Apps", "All Data"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Trudiagnostic", "Test Kits & Apps", "Interventions"])
 
 # === Try to restore saved CSV (stateless ghost-block logic)
 if not st.session_state.get("function_csv_ready"):
@@ -808,32 +808,32 @@ with tab4:
             st.divider()
             input_metric("Matter: # Memories with Dopamine", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Dopamine**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("Matter: # Memories with Serotonin", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Serotonin**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("Matter: # Memories with Oxytocin", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Oxytocin**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("Matter: # Memories with Cannabinoids", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Cannabinoids**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("Matter: # Memories with Opioids", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Opioids**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("Matter: # Memories with Testosterone", """• Open the Matter App on your iPhone  
             • On the home screen, find the box labeled **Testosterone**  
-            • Look for the number in the **gray circle** at the top-left corner of the box""")
+            • Look for the number in the **gray circle** in the top-left corner""")
 
             st.divider()
             input_metric("BioStarks: Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
@@ -864,8 +864,8 @@ with tab4:
             • Value will be shown in **ug/gHb**""")
 
             st.divider()
-            input_metric("Hero: VO2 Max (best result)", """• Open the Hero App on your iPhone  
-            • Look for your highest **VO2 Max** result""")
+            input_metric("Hero: VO2 Max", """• Open the Hero App on your iPhone  
+            • Look for your April **VO2 Max** result""")
 
             submitted = st.form_submit_button("Submit")
 
@@ -939,220 +939,211 @@ with tab4:
             st.session_state.reset_testkit = True
             st.rerun()
 
-with tab5:
-    st.markdown("## Behavioral Data")
-    behavior_scores_file = f"{username}/behavioral_scores.csv"
-    try:
-        behavior_scores_bytes = user_supabase.storage.from_("data").download(behavior_scores_file)
-        if isinstance(behavior_scores_bytes, bytes):
-            behavior_scores_df = pd.read_csv(io.BytesIO(behavior_scores_bytes))
-            st.dataframe(behavior_scores_df)
-        else:
-            st.info("Please add your behavioral data.")
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please add your behavioral data.")
-        else:
-            st.warning("There was an error retrieving your behavioral data. Please contact admin.")
-
-    st.markdown("## Oregon Data")
-    oregon_file = f"{username}/Oregon.csv"
-    try:
-        oregon_bytes = user_supabase.storage.from_("data").download(oregon_file)
-        if isinstance(oregon_bytes, bytes):
-            oregon_df = pd.read_csv(io.BytesIO(oregon_bytes))
-            st.dataframe(oregon_df)
-        else:
-            st.info("Please add your Oregon data.")
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please add your Oregon data.")
-        else:
-            st.warning("There was an error retrieving your Oregon data. Please contact admin.")
-
-    st.markdown("## Function Health Data")
-    fh_file = f"{username}/functionhealth.csv"
-    bucket = user_supabase.storage.from_("data")
-
-    try:
-        fh_bytes = bucket.download(fh_file)
-        if isinstance(fh_bytes, bytes):
-            fh_df = pd.read_csv(io.BytesIO(fh_bytes))
-            st.dataframe(fh_df)
-        else:
-            st.info("Please add your Function Health data.")
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please import your Function Health data.")
-        else:
-            st.warning("There was an error retrieving your Function Health data. Please contact admin.")
-
-    st.markdown("## Prenuvo Data")
-    prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
-    try:
-        prenuvo_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
-        if isinstance(prenuvo_bytes, bytes):
-            b64 = base64.b64encode(prenuvo_bytes).decode()
-            st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_prenuvo_report.pdf'>Click here to download your redacted Prenuvo report.</a>", unsafe_allow_html=True)
-        else:
-            st.info("Please add your Prenuvo data.")
-    except Exception as e:
-        st.info("Please add your Prenuvo data.")
-
-    st.markdown("## Trudiagnostic Data")
-    trudiagnostic_pdf_path = f"{username}/redacted_trudiagnostic_report.pdf"
-    try:
-        trudiagnostic_bytes = user_supabase.storage.from_("data").download(trudiagnostic_pdf_path)
-        if isinstance(trudiagnostic_bytes, bytes):
-            b64 = base64.b64encode(trudiagnostic_bytes).decode()
-            st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_trudiagnostic_report.pdf'>Click here to download your redacted Trudiagnostic report.</a>", unsafe_allow_html=True)
-        else:
-            st.info("Please add your Trudiagnostic data.")
-    except Exception as e:
-        st.info("Please add your Trudiagnostic data.")
-
-    st.markdown("## Test Kit & App Data")
-    testkit_file = f"{username}/test_kits.csv"
-    try:
-        testkit_bytes = user_supabase.storage.from_("data").download(testkit_file)
-        if isinstance(testkit_bytes, bytes):
-            testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
-            st.dataframe(testkit_df)
-        else:
-            st.info("Please add your Test Kit data.")
-    except Exception as e:
-        error_msg = str(e).lower()
-        if "not found" in error_msg or "no such file" in error_msg:
-            st.info("Please add your Test Kit & App data.")
-        else:
-            st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
-
-
-# with tab6:
-#     st.markdown("""
-#     ## Intervention Plan
-
-#     Use this space to design your personalized 8-week intervention plan. 
-#     Choose which domains you'd like to focus on, then describe the specific actions you'll commit to. 
-#     Your plan will be saved and viewable any time you return.
-#     """, unsafe_allow_html=True)
-
-#     focus_areas = [
-#         "Emotional Wellbeing",
-#         "Mental Fitness",
-#         "Physical Fitness",
-#         "Metabolic Fitness",
-#         "Sleep",
-#         "Addiction Dependency"
-#     ]
-
-#     examples = {
-#         "Emotional Wellbeing": "Example: Morning walks in nature 3x/week to discover silent spots. Weekend trips to scenic places.",
-#         "Mental Fitness": "Example: Daily Nuroe working memory game. Weekly cognitive training exercises.",
-#         "Physical Fitness": "Example: Add 1–2 60-90 minute GA1 endurance sessions per week.",
-#         "Metabolic Fitness": "Example: Supplement Fe, Zn, Mg, NMN+. Reduce sugar. Aim for HbA1c < 6.5.",
-#         "Sleep": "Example: Set 10:30 PM bedtime, limit screen use after 9 PM, take magnesium glycinate.",
-#         "Addiction Dependency": "Example: Reduce phone or social media use. Replace late-night scrolling with journaling. Limit alcohol to 1x/week. Track urges daily."
-#     }
-
-#     if "intervention_step" not in st.session_state:
-#         st.session_state.intervention_step = "select_areas"
-
-#     if st.session_state.intervention_step == "select_areas":
-#         st.markdown("### Choose your focus areas")
-#         with st.form("intervention_focus_area_form"):
-#             selected = st.multiselect("Select areas to focus on:", focus_areas, default=st.session_state.get("intervention_selected_areas", []))
-#             proceed = st.form_submit_button("Next")
-#             if proceed:
-#                 st.session_state.intervention_selected_areas = selected
-#                 st.session_state.intervention_step = "enter_plans"
-#                 st.rerun()
-
-#     elif st.session_state.intervention_step == "enter_plans" and "intervention_plan_df" not in st.session_state:
-#         st.markdown("### Describe Your Plans")
-
-#         with st.spinner("Loading plan fields..."):
-#             with st.form("intervention_plan_entry_form"):
-#                 plans = {}
-#                 for area in st.session_state.intervention_selected_areas:
-#                     plans[area] = st.text_area(
-#                         f"Plan for {area}",
-#                         key=f"plan_{area}",
-#                         placeholder=examples.get(area, f"What do you want to do to improve your {area.lower()} over the next 8 weeks?")
-#                     )
-#                 submitted = st.form_submit_button("Save My Plan")
-
-#             if submitted:
-#                 import pandas as pd
-#                 import io
-#                 from datetime import datetime
-
-#                 plan_df = pd.DataFrame([(k, v) for k, v in plans.items()], columns=["Category", "Plan"])
-#                 st.session_state.intervention_plan_df = plan_df
-
-#                 # Save to Supabase
-#                 csv_bytes = plan_df.to_csv(index=False).encode()
-#                 plan_filename = f"{username}/intervention_plan.csv"
-#                 bucket = user_supabase.storage.from_("data")
-
-#                 try:
-#                     bucket.remove([plan_filename])
-#                 except:
-#                     pass
-
-#                 bucket.upload(
-#                     path=plan_filename,
-#                     file=csv_bytes,
-#                     file_options={"content-type": "text/csv"}
-#                 )
-
-#                 st.session_state.intervention_plan_timestamp = datetime.utcnow().strftime("%B %d, %Y")
-#                 st.success("Your plan has been saved!")
-#                 st.rerun()
-
-#     # Load plan from Supabase if not already in session
-#     if "intervention_plan_df" not in st.session_state:
-#         try:
-#             plan_filename = f"{username}/intervention_plan.csv"
-#             metadata = user_supabase.storage.from_("data").list(username)
-#             matching = next((f for f in metadata if f["name"] == "intervention_plan.csv"), None)
-#             if matching and "updated_at" in matching:
-#                 import pandas as pd
-#                 import io
-#                 from dateutil import parser
-#                 st.session_state.intervention_plan_timestamp = parser.parse(matching["updated_at"]).strftime("%B %d, %Y")
-#             bytes_data = user_supabase.storage.from_("data").download(plan_filename)
-#             if isinstance(bytes_data, bytes):
-#                 df = pd.read_csv(io.BytesIO(bytes_data))
-#                 st.session_state.intervention_plan_df = df
-#         except:
-#             pass
-
-#     # Show previously saved plan if exists
-#     if "intervention_plan_df" in st.session_state:
-#         timestamp = st.session_state.get("intervention_plan_timestamp")
-#         if timestamp:
-#             st.markdown(f"### Your Plan (Saved on {timestamp})")
+# with tab5:
+#     st.markdown("## Behavioral Data")
+#     behavior_scores_file = f"{username}/behavioral_scores.csv"
+#     try:
+#         behavior_scores_bytes = user_supabase.storage.from_("data").download(behavior_scores_file)
+#         if isinstance(behavior_scores_bytes, bytes):
+#             behavior_scores_df = pd.read_csv(io.BytesIO(behavior_scores_bytes))
+#             st.dataframe(behavior_scores_df)
 #         else:
-#             st.markdown("### Your Saved Plan")
-#         st.dataframe(st.session_state.intervention_plan_df)
+#             st.info("Please add your behavioral data.")
+#     except Exception as e:
+#         error_msg = str(e).lower()
+#         if "not found" in error_msg or "no such file" in error_msg:
+#             st.info("Please add your behavioral data.")
+#         else:
+#             st.warning("There was an error retrieving your behavioral data. Please contact admin.")
 
-#         if st.button("Start Over"):
-#             plan_filename = f"{username}/intervention_plan.csv"
-#             bucket = user_supabase.storage.from_("data")
-#             try:
-#                 bucket.remove([plan_filename])
-#             except:
-#                 pass
-#             for key in [
-#                 "intervention_step",
-#                 "intervention_selected_areas",
-#                 "intervention_plan_df",
-#                 "intervention_plan_timestamp"
-#             ]:
-#                 st.session_state.pop(key, None)
-#             st.rerun()
+#     st.markdown("## Oregon Data")
+#     oregon_file = f"{username}/Oregon.csv"
+#     try:
+#         oregon_bytes = user_supabase.storage.from_("data").download(oregon_file)
+#         if isinstance(oregon_bytes, bytes):
+#             oregon_df = pd.read_csv(io.BytesIO(oregon_bytes))
+#             st.dataframe(oregon_df)
+#         else:
+#             st.info("Please add your Oregon data.")
+#     except Exception as e:
+#         error_msg = str(e).lower()
+#         if "not found" in error_msg or "no such file" in error_msg:
+#             st.info("Please add your Oregon data.")
+#         else:
+#             st.warning("There was an error retrieving your Oregon data. Please contact admin.")
+
+#     st.markdown("## Function Health Data")
+#     fh_file = f"{username}/functionhealth.csv"
+#     bucket = user_supabase.storage.from_("data")
+
+#     try:
+#         fh_bytes = bucket.download(fh_file)
+#         if isinstance(fh_bytes, bytes):
+#             fh_df = pd.read_csv(io.BytesIO(fh_bytes))
+#             st.dataframe(fh_df)
+#         else:
+#             st.info("Please add your Function Health data.")
+#     except Exception as e:
+#         error_msg = str(e).lower()
+#         if "not found" in error_msg or "no such file" in error_msg:
+#             st.info("Please import your Function Health data.")
+#         else:
+#             st.warning("There was an error retrieving your Function Health data. Please contact admin.")
+
+#     st.markdown("## Prenuvo Data")
+#     prenuvo_pdf_path = f"{username}/redacted_prenuvo_report.pdf"
+#     try:
+#         prenuvo_bytes = user_supabase.storage.from_("data").download(prenuvo_pdf_path)
+#         if isinstance(prenuvo_bytes, bytes):
+#             b64 = base64.b64encode(prenuvo_bytes).decode()
+#             st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_prenuvo_report.pdf'>Click here to download your redacted Prenuvo report.</a>", unsafe_allow_html=True)
+#         else:
+#             st.info("Please add your Prenuvo data.")
+#     except Exception as e:
+#         st.info("Please add your Prenuvo data.")
+
+#     st.markdown("## Trudiagnostic Data")
+#     trudiagnostic_pdf_path = f"{username}/redacted_trudiagnostic_report.pdf"
+#     try:
+#         trudiagnostic_bytes = user_supabase.storage.from_("data").download(trudiagnostic_pdf_path)
+#         if isinstance(trudiagnostic_bytes, bytes):
+#             b64 = base64.b64encode(trudiagnostic_bytes).decode()
+#             st.markdown(f"<a href='data:application/pdf;base64,{b64}' download='redacted_trudiagnostic_report.pdf'>Click here to download your redacted Trudiagnostic report.</a>", unsafe_allow_html=True)
+#         else:
+#             st.info("Please add your Trudiagnostic data.")
+#     except Exception as e:
+#         st.info("Please add your Trudiagnostic data.")
+
+#     st.markdown("## Test Kit & App Data")
+#     testkit_file = f"{username}/test_kits.csv"
+#     try:
+#         testkit_bytes = user_supabase.storage.from_("data").download(testkit_file)
+#         if isinstance(testkit_bytes, bytes):
+#             testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
+#             st.dataframe(testkit_df)
+#         else:
+#             st.info("Please add your Test Kit data.")
+#     except Exception as e:
+#         error_msg = str(e).lower()
+#         if "not found" in error_msg or "no such file" in error_msg:
+#             st.info("Please add your Test Kit & App data.")
+#         else:
+#             st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
+
+
+with tab5:
+    # === Try to load saved plan if not already in session state ===
+    if "intervention_plan_df" not in st.session_state:
+        try:
+            plan_filename = f"{username}/intervention_plan.csv"
+            bucket = user_supabase.storage.from_("data")
+
+            # Step 1: List all files under this user
+            metadata = bucket.list(username)
+            filenames = [f["name"] for f in metadata]
+
+            # Step 2: Only proceed if file exists
+            if "intervention_plan.csv" in filenames:
+                # Grab timestamp
+                matching = next((f for f in metadata if f["name"] == "intervention_plan.csv"), None)
+                if matching and "updated_at" in matching:
+                    from dateutil import parser
+                    st.session_state.intervention_plan_timestamp = parser.parse(matching["updated_at"]).strftime("%B %d, %Y")
+
+                # Download the file
+                import pandas as pd
+                import io
+                bytes_data = bucket.download(plan_filename)
+                if isinstance(bytes_data, bytes):
+                    df = pd.read_csv(io.BytesIO(bytes_data))
+                    st.session_state.intervention_plan_df = df
+        except:
+            pass
+
+    # === If saved plan exists, show it only ===
+    if "intervention_plan_df" in st.session_state:
+        timestamp = st.session_state.get("intervention_plan_timestamp")
+        st.markdown(f"## Intervention Plan (Saved on {timestamp})" if timestamp else "## Intervention Plan")
+        st.dataframe(st.session_state.intervention_plan_df)
+
+    # === Otherwise, guide the user to create a new plan ===
+    else:
+        st.markdown("""
+        ## Intervention Plan
+
+        Use this space to design your personalized 8-week intervention plan. 
+        Choose which domains you'd like to focus on, then describe the specific actions you'll commit to. 
+        Your plan will be saved and viewable any time you return.
+        """, unsafe_allow_html=True)
+
+        focus_areas = [
+            "Emotional Wellbeing",
+            "Mental Fitness",
+            "Physical Fitness",
+            "Metabolic Fitness",
+            "Sleep",
+            "Addiction Dependency"
+        ]
+
+        examples = {
+            "Emotional Wellbeing": "Example: Morning walks in nature 3x/week to discover silent spots. Weekend trips to scenic places.",
+            "Mental Fitness": "Example: Daily Nuroe working memory game. Weekly cognitive training exercises.",
+            "Physical Fitness": "Example: Add 1–2 60-90 minute GA1 endurance sessions per week.",
+            "Metabolic Fitness": "Example: Supplement Fe, Zn, Mg, NMN+. Reduce sugar. Aim for HbA1c < 6.5.",
+            "Sleep": "Example: Set 10:30 PM bedtime, limit screen use after 9 PM, take magnesium glycinate.",
+            "Addiction Dependency": "Example: Reduce phone or social media use. Replace late-night scrolling with journaling. Limit alcohol to 1x/week. Track urges daily."
+        }
+
+        if "intervention_step" not in st.session_state:
+            st.session_state.intervention_step = "select_areas"
+
+        if st.session_state.intervention_step == "select_areas":
+            st.markdown("### Choose your focus areas")
+            with st.form("intervention_focus_area_form"):
+                selected = st.multiselect("Select areas to focus on:", focus_areas, default=st.session_state.get("intervention_selected_areas", []))
+                proceed = st.form_submit_button("Next")
+                if proceed:
+                    st.session_state.intervention_selected_areas = selected
+                    st.session_state.intervention_step = "enter_plans"
+                    st.rerun()
+
+        elif st.session_state.intervention_step == "enter_plans":
+            st.markdown("### Describe Your Plans")
+            with st.spinner("Loading plan fields..."):
+                with st.form("intervention_plan_entry_form"):
+                    plans = {}
+                    for area in st.session_state.intervention_selected_areas:
+                        plans[area] = st.text_area(
+                            f"Plan for {area}",
+                            key=f"plan_{area}",
+                            placeholder=examples.get(area, f"What do you want to do to improve your {area.lower()} over the next 8 weeks?")
+                        )
+                    submitted = st.form_submit_button("Save My Plan")
+
+                if submitted:
+                    import pandas as pd
+                    import io
+                    from datetime import datetime
+
+                    plan_df = pd.DataFrame([(k, v) for k, v in plans.items()], columns=["Category", "Plan"])
+                    st.session_state.intervention_plan_df = plan_df
+
+                    # Save to Supabase
+                    csv_bytes = plan_df.to_csv(index=False).encode()
+                    plan_filename = f"{username}/intervention_plan.csv"
+                    bucket = user_supabase.storage.from_("data")
+
+                    try:
+                        bucket.remove([plan_filename])
+                    except:
+                        pass
+
+                    bucket.upload(
+                        path=plan_filename,
+                        file=csv_bytes,
+                        file_options={"content-type": "text/csv"}
+                    )
+
+                    st.session_state.intervention_plan_timestamp = datetime.utcnow().strftime("%B %d, %Y")
+                    st.rerun()
 
