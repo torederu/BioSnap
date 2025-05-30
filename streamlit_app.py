@@ -260,7 +260,7 @@ user_supabase = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_SER
 if st.session_state.pop("just_deleted", False) or st.session_state.pop("just_imported", False):
     st.rerun()
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Trudiagnostic", "Test Kits & Apps", "Interventions"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Function Health", "Prenuvo", "Trudiagnostic", "Biostarks", "Interventions"])
 
 # === Try to restore saved CSV (stateless ghost-block logic)
 if not st.session_state.get("function_csv_ready"):
@@ -727,49 +727,50 @@ with tab3:
 
 
 with tab4:
-    st.markdown("<h1>Test Kits & Apps</h1>", unsafe_allow_html=True)
+    st.markdown("<h1>Biostarks</h1>", unsafe_allow_html=True)
 
-    testkit_filename = f"{username}/test_kits.csv"
+    biostarks_filename = f"{username}/biostarks.csv"
     bucket = user_supabase.storage.from_("data")
 
     # === Load saved CSV if available — block ghost files
-    if "testkit_df" not in st.session_state:
+    if "biostarks_df" not in st.session_state:
         try:
-            testkit_bytes = bucket.download(testkit_filename)
+            biostarks_bytes = bucket.download(biostarks_filename)
             files = bucket.list(path=username)
-            in_list = any(f["name"] == "test_kits.csv" for f in files)
+            in_list = any(f["name"] == "biostarks.csv" for f in files)
 
-            if testkit_bytes and len(testkit_bytes) > 0 and in_list:
-                st.session_state.testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
+            if biostarks_bytes and len(biostarks_bytes) > 0 and in_list:
+                st.session_state.biostarks_df = pd.read_csv(io.BytesIO(biostarks_bytes))
             else:
-                st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+                st.session_state.biostarks_df = pd.DataFrame(columns=["Metric", "Value"])
         except Exception:
-            st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+            st.session_state.biostarks_df = pd.DataFrame(columns=["Metric", "Value"])
 
     # === Handle Start Over ===
-    if st.session_state.get("reset_testkit", False):
+    if st.session_state.get("reset_biostarks", False):
         with st.spinner("Deleting file from database..."):
             try:
-                bucket.remove([testkit_filename])
-                st.session_state.testkit_deleted = True
+                bucket.remove([biostarks_filename])
+                st.session_state.biostarks_deleted = True
             except Exception as e:
                 st.warning(f"Failed to delete file: {e}")
-                st.session_state.testkit_deleted = False
+                st.session_state.biostarks_deleted = False
 
-        for key in ["reset_testkit", "testkit_submitted"]:
+        for key in ["reset_biostarks", "biostarks_submitted"]:
             st.session_state.pop(key, None)
 
-        st.session_state.testkit_df = pd.DataFrame(columns=["Test Kit", "Metric", "Value"])
+        st.session_state.biostarks_df = pd.DataFrame(columns=["Metric", "Value"])
         st.rerun()
 
     # === If no data yet, show form ===
-    if st.session_state.testkit_df.empty:
+    if st.session_state.biostarks_df.empty:
         st.markdown("""
         <div style='font-size:17.5px; line-height:1.6'>
-        Please complete the fields below using your latest data from each app or test kit.<br><br>
-        </div>""", unsafe_allow_html=True)
+        Please log in to <a href='https://results.biostarks.com/' target='_blank'>Biostarks</a> and fill in the fields below with the relevant values.<br><br>
+        </div>
+        """, unsafe_allow_html=True)
 
-        with st.form("testkit_form", border=True):
+        with st.form("biostarks_form", border=True):
 
             def input_metric(label, expander_text):
                 with st.container():
@@ -785,106 +786,41 @@ with tab4:
                 st.text_input(label, key=label, label_visibility="collapsed")
 
             # === Input fields ===
-            input_metric("Matter Score (all time)", """• Open the Matter App on your iPhone  
-            • Tap **\"You\"** in the bottom menu  
-            • Tap **\"Stats\"**  
-            • Scroll to **Stats to Date**  
-            • Find your **Matter Score**""")
-
-            st.divider()
-            input_metric("Matter: # of Memories", """• Open the Matter App on your iPhone  
-            • Tap **\"You\"** in the bottom menu  
-            • Tap **\"Stats\"**  
-            • Scroll to **Stats to Date**  
-            • Find **Total Memories**""")
-
-            st.divider()
-            input_metric("Matter: # of Good Days", """• Open the Matter App on your iPhone  
-            • Tap **\"You\"** in the bottom menu  
-            • Tap **\"Stats\"**  
-            • Scroll to **Stats to Date**  
-            • Find your # of **Good Days**""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Dopamine", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Dopamine**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Serotonin", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Serotonin**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Oxytocin", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Oxytocin**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Cannabinoids", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Cannabinoids**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Opioids", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Opioids**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("Matter: # Memories with Testosterone", """• Open the Matter App on your iPhone  
-            • On the home screen, find the box labeled **Testosterone**  
-            • Look for the number in the **gray circle** in the top-left corner""")
-
-            st.divider()
-            input_metric("BioStarks: Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            input_metric("Longevity NAD+ Score", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Look for your **Longevity Score** (0–100)""")
 
             st.divider()
-            input_metric("BioStarks: NAD+ Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            input_metric("NAD+ Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **NAD+** hexagon  
             • Value will be shown in **ug/gHb**""")
 
             st.divider()
-            input_metric("BioStarks: Magnesium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            input_metric("Magnesium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Mg** hexagon  
             • Value will be shown in **ug/gHb**""")
 
             st.divider()
-            input_metric("BioStarks: Selenium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            input_metric("Selenium Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Se** hexagon  
             • Value will be shown in **ug/gHb**""")
 
             st.divider()
-            input_metric("BioStarks: Zinc Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
+            input_metric("Zinc Levels", """• Log in to [results.biostarks.com](https://results.biostarks.com)  
             • Click your **Longevity Score**  
             • Hover over the **Zn** hexagon  
             • Value will be shown in **ug/gHb**""")
 
-            st.divider()
-            input_metric("Hero: VO2 Max", """• Open the Hero App on your iPhone  
-            • Look for your April **VO2 Max** result""")
-
             submitted = st.form_submit_button("Submit")
 
         required_keys = [
-            "Matter Score (all time)",
-            "Matter: # of Memories",
-            "Matter: # of Good Days",
-            "Matter: # Memories with Dopamine",
-            "Matter: # Memories with Serotonin",
-            "Matter: # Memories with Oxytocin",
-            "Matter: # Memories with Cannabinoids",
-            "Matter: # Memories with Opioids",
-            "Matter: # Memories with Testosterone",
-            "BioStarks: Longevity NAD+ Score",
-            "BioStarks: NAD+ Levels",
-            "BioStarks: Magnesium Levels",
-            "BioStarks: Selenium Levels",
-            "BioStarks: Zinc Levels",
-            "Hero: VO2 Max (best result)",
+            "Longevity NAD+ Score",
+            "NAD+ Levels",
+            "Magnesium Levels",
+            "Selenium Levels",
+            "Zinc Levels",
         ]
 
         if submitted:
@@ -892,51 +828,41 @@ with tab4:
             if missing:
                 st.error("Please complete all required fields before submitting.")
             else:
-                testkit_df = pd.DataFrame([
-                    ["Matter", "Matter Score (all time)", st.session_state["Matter Score (all time)"]],
-                    ["Matter", "# of Memories", st.session_state["Matter: # of Memories"]],
-                    ["Matter", "# of Good Days", st.session_state["Matter: # of Good Days"]],
-                    ["Matter", "# Memories with Dopamine", st.session_state["Matter: # Memories with Dopamine"]],
-                    ["Matter", "# Memories with Serotonin", st.session_state["Matter: # Memories with Serotonin"]],
-                    ["Matter", "# Memories with Oxytocin", st.session_state["Matter: # Memories with Oxytocin"]],
-                    ["Matter", "# Memories with Cannabinoids", st.session_state["Matter: # Memories with Cannabinoids"]],
-                    ["Matter", "# Memories with Opioids", st.session_state["Matter: # Memories with Opioids"]],
-                    ["Matter", "# Memories with Testosterone", st.session_state["Matter: # Memories with Testosterone"]],
-                    ["BioStarks", "Longevity NAD+ Score", st.session_state["BioStarks: Longevity NAD+ Score"]],
-                    ["BioStarks", "NAD+ Levels", st.session_state["BioStarks: NAD+ Levels"]],
-                    ["BioStarks", "Magnesium Levels", st.session_state["BioStarks: Magnesium Levels"]],
-                    ["BioStarks", "Selenium Levels", st.session_state["BioStarks: Selenium Levels"]],
-                    ["BioStarks", "Zinc Levels", st.session_state["BioStarks: Zinc Levels"]],
-                    ["Hero", "VO2 Max (best result)", st.session_state["Hero: VO2 Max (best result)"]],
-                ], columns=["Test Kit or App", "Metric", "Value"])
+                biostarks_df = pd.DataFrame([
+                    ["Longevity NAD+ Score", st.session_state["Longevity NAD+ Score"]],
+                    ["NAD+ Levels", st.session_state["NAD+ Levels"]],
+                    ["Magnesium Levels", st.session_state["Magnesium Levels"]],
+                    ["Selenium Levels", st.session_state["Selenium Levels"]],
+                    ["Zinc Levels", st.session_state["Zinc Levels"]],
+                ], columns=["Metric", "Value"])
 
 
                 with st.spinner("Saving to database..."):
-                    st.session_state.testkit_df = testkit_df
-                    testkit_csv_bytes = testkit_df.to_csv(index=False).encode()
+                    st.session_state.biostarks_df = biostarks_df
+                    biostarks_csv_bytes = biostarks_df.to_csv(index=False).encode()
 
                     try:
-                        bucket.remove([testkit_filename])
+                        bucket.remove([biostarks_filename])
                     except:
                         pass
 
                     bucket.upload(
-                        path=testkit_filename,
-                        file=testkit_csv_bytes,
+                        path=biostarks_filename,
+                        file=biostarks_csv_bytes,
                         file_options={"content-type": "text/csv"}
                     )
 
                     time.sleep(1)
-                    st.session_state["testkit_submitted"] = True
+                    st.session_state["biostarks_submitted"] = True
                     st.rerun()
 
     # === If data exists, show table and start over ===
     else:
-        st.dataframe(st.session_state.testkit_df)
+        st.dataframe(st.session_state.biostarks_df)
         st.success("Upload successful!")
 
-        if st.button("Start Over", key="reset_testkit"):
-            st.session_state.reset_testkit = True
+        if st.button("Start Over", key="reset_biostarks"):
+            st.session_state.reset_biostarks = True
             st.rerun()
 
 # with tab5:
@@ -1014,21 +940,21 @@ with tab4:
 #     except Exception as e:
 #         st.info("Please add your Trudiagnostic data.")
 
-#     st.markdown("## Test Kit & App Data")
-#     testkit_file = f"{username}/test_kits.csv"
+#     st.markdown("## Biostarks")
+#     biostarks_file = f"{username}/biostarks.csv"
 #     try:
-#         testkit_bytes = user_supabase.storage.from_("data").download(testkit_file)
-#         if isinstance(testkit_bytes, bytes):
-#             testkit_df = pd.read_csv(io.BytesIO(testkit_bytes))
-#             st.dataframe(testkit_df)
+#         biostarks_bytes = user_supabase.storage.from_("data").download(biostarks_file)
+#         if isinstance(biostarks_bytes, bytes):
+#             biostarks_df = pd.read_csv(io.BytesIO(biostarks_bytes))
+#             st.dataframe(biostarks_df)
 #         else:
-#             st.info("Please add your Test Kit data.")
+#             st.info("Please add your Biostarks data.")
 #     except Exception as e:
 #         error_msg = str(e).lower()
 #         if "not found" in error_msg or "no such file" in error_msg:
-#             st.info("Please add your Test Kit & App data.")
+#             st.info("Please add your Biostarks data.")
 #         else:
-#             st.warning("There was an error retrieving your Test Kit & App data. Please contact admin.")
+#             st.warning("There was an error retrieving your Biostarks data. Please contact admin.")
 
 
 with tab5:
@@ -1146,4 +1072,3 @@ with tab5:
 
                     st.session_state.intervention_plan_timestamp = datetime.utcnow().strftime("%B %d, %Y")
                     st.rerun()
-
